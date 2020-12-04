@@ -19,7 +19,34 @@ public final class SimplePathHandle implements PathHandle{
         this.pathId = pathId;
     }
 
-    int id() {
+    public int id() {
         return pathId;
     }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 71 * hash + this.pathId;
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final SimplePathHandle other = (SimplePathHandle) obj;
+        if (this.pathId != other.pathId) {
+            return false;
+        }
+        return true;
+    }
+    
+    
 }

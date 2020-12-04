@@ -6,9 +6,8 @@
 package sib.swiss.swissprot.handlegraph4j.simple.builders;
 
 import io.github.vgteam.handlegraph4j.gfa1.GFA1Reader;
-import io.github.vgteam.handlegraph4j.iterators.PathHandleIterator;
-import io.github.vgteam.handlegraph4j.iterators.StepHandleIterator;
 import java.util.Arrays;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import sib.swiss.swissprot.handlegraph4j.simple.SimplePathGraph;
@@ -73,13 +72,15 @@ public class SimplePathGraphFromGFA1BuilderTest {
         instance.parse(gFA1Reader);
         SimplePathGraph graph = instance.build();
         assertFalse(graph.isEmpty());
-        try ( PathHandleIterator<SimplePathHandle> paths = graph.paths()) {
+        try ( Stream<SimplePathHandle> pathsS = graph.paths()) {
+            var paths = pathsS.iterator();
             assertTrue(paths.hasNext());
             SimplePathHandle path = paths.next();
             assertNotNull(path);
             assertEquals("x", graph.nameOfPath(path));
 
-            try ( StepHandleIterator<SimpleStepHandle> steps = graph.stepsOf(path)) {
+            try ( Stream<SimpleStepHandle> stepsS = graph.stepsOf(path)) {
+                var steps = stepsS.iterator();
                 int[] expectedNodeIds = new int[]{1, 3, 5, 6, 8, 9, 11, 12, 14, 15, 3};
                 int expectedRank=0;
                 for (int expectedNodeId : expectedNodeIds) {

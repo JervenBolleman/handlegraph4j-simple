@@ -35,4 +35,42 @@ public final class SimpleStepHandle implements StepHandle{
     long rank(){
         return rank;
     }
+
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 47 * hash + this.pathId;
+        hash = 47 * hash + (int) (this.nodeId ^ (this.nodeId >>> 32));
+        hash = 47 * hash + (int) (this.rank ^ (this.rank >>> 32));
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final SimpleStepHandle other = (SimpleStepHandle) obj;
+        if (this.pathId != other.pathId) {
+            return false;
+        }
+        if (this.nodeId != other.nodeId) {
+            return false;
+        }
+        if (this.rank != other.rank) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public String toString() {
+        return "SimpleStepHandle{" + "pathId=" + pathId + ", nodeId=" + nodeId + ", rank=" + rank + '}';
+    }
 }

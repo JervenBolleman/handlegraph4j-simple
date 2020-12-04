@@ -7,16 +7,14 @@ package sib.swiss.swissprot.handlegraph4j.simple;
 
 import sib.swiss.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
 import io.github.vgteam.handlegraph4j.PathGraph;
-import io.github.vgteam.handlegraph4j.PathHandle;
-import io.github.vgteam.handlegraph4j.iterators.EdgeHandleIterator;
-import io.github.vgteam.handlegraph4j.iterators.NodeHandleIterator;
-import io.github.vgteam.handlegraph4j.iterators.PathHandleIterator;
-import io.github.vgteam.handlegraph4j.iterators.StepHandleIterator;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import org.eclipse.collections.api.iterator.LongIterator;
 import org.eclipse.collections.api.list.primitive.LongList;
 import sib.swiss.swissprot.handlegraph4j.simple.datastructures.NodeToSequenceMap;
@@ -40,66 +38,22 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     }
 
     @Override
-    public PathHandleIterator<SimplePathHandle> paths() {
-        final Iterator<SimplePathHandle> iter = paths.values().iterator();
-        return new PathHandleIterator() {
-            @Override
-            public boolean hasNext() {
-                return iter.hasNext();
-            }
-
-            @Override
-            public PathHandle next() {
-                return iter.next();
-            }
-
-            @Override
-            public void close() throws Exception {
-            }
-        };
+    public Stream<SimplePathHandle> paths() {
+        return paths.values().stream();
     }
 
     @Override
-    public StepHandleIterator steps() {
-        Iterator<StepHandleIterator> map = paths.values().stream().map(this::stepsOf).iterator();
-
-        return new StepHandleIterator() {
-            StepHandleIterator current = null;
-
-            @Override
-            public boolean hasNext() {
-                while (current == null && map.hasNext()) {
-                    current = map.next();
-                    if (! current.hasNext())
-                        current = null;
-                }
-                if (current != null && current.hasNext()) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-
-            @Override
-            public Object next() {
-                Object next = current.next();
-                if (!current.hasNext())
-                    current = null;
-                return next;
-            }
-
-            @Override
-            public void close() throws Exception {
-                
-            }
-
-        };
+    public Stream<SimpleStepHandle> steps() {
+        return paths.values().stream().flatMap(this::stepsOf);
     }
 
     @Override
-    public StepHandleIterator stepsOf(SimplePathHandle ph) {
-        LongIterator longIterator = pathsToSteps.get(ph).longIterator();
-        return new StepHandleIteratorImpl(longIterator, ph.id());
+    public Stream<SimpleStepHandle> stepsOf(SimplePathHandle ph) {
+        LongList stepsOfPath = pathsToSteps.get(ph);
+        LongIterator longIterator = stepsOfPath.longIterator();
+        StepHandleIteratorImpl stepHandleIteratorImpl = new StepHandleIteratorImpl(longIterator, ph.id());
+        Spliterator<SimpleStepHandle> spliterator = Spliterators.spliterator(stepHandleIteratorImpl, pathsToSteps.size(), Spliterator.SIZED);
+        return StreamSupport.stream(spliterator, false);
     }
 
     @Override
@@ -114,8 +68,12 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
 
     @Override
     public long asLong(SimpleNodeHandle nh) {
-
         return nh.id();
+    }
+
+    @Override
+    public SimpleNodeHandle fromLong(long id) {
+        return new SimpleNodeHandle(id);
     }
 
     @Override
@@ -124,17 +82,22 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     }
 
     @Override
-    public EdgeHandleIterator<SimpleNodeHandle, SimpleEdgeHandle> followEdges(SimpleNodeHandle left, boolean b) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public Stream<SimpleEdgeHandle> followEdgesToWardsTheRight(SimpleNodeHandle left) {
+        return edges.streamToLeft(left);
     }
 
     @Override
-    public EdgeHandleIterator<SimpleNodeHandle, SimpleEdgeHandle> edges() {
-        return edges.iterator();
+    public Stream<SimpleEdgeHandle> followEdgesToWardsTheLeft(SimpleNodeHandle right) {
+        return edges.streamToRight(right);
     }
 
     @Override
-    public NodeHandleIterator nodes() {
+    public Stream<SimpleEdgeHandle> edges() {
+        return edges.stream();
+    }
+
+    @Override
+    public Stream<SimpleNodeHandle> nodes() {
         return nodeToSequenceMap.nodes();
     }
 
@@ -144,11 +107,11 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     }
 
     @Override
-    public Sequence getSequence(SimpleNodeHandle handle) {
+    public Sequence sequenceOf(SimpleNodeHandle handle) {
         return nodeToSequenceMap.getSequence(handle);
     }
 
-    private static class StepHandleIteratorImpl implements StepHandleIterator<SimpleStepHandle> {
+    private static class StepHandleIteratorImpl implements Iterator<SimpleStepHandle> {
 
         private final LongIterator steps;
         private long rank = 0;
@@ -168,10 +131,6 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
         public SimpleStepHandle next() {
             long next = steps.next();
             return new SimpleStepHandle(pathId, next, rank++);
-        }
-
-        @Override
-        public void close() throws Exception {
         }
     }
 
@@ -194,6 +153,11 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     }
 
     @Override
+    public SimplePathHandle pathByName(String name) {
+        return paths.get(name);
+    }
+
+    @Override
     public SimplePathHandle pathOfStep(SimpleStepHandle s) {
         return new SimplePathHandle(s.pathId());
     }
@@ -206,6 +170,47 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     @Override
     public long rankOfStep(SimpleStepHandle s) {
         return s.rank();
+    }
+
+    @Override
+    public long beginPositionOfStep(SimpleStepHandle s) {
+        if (nodeToSequenceMap.areAllSequencesOneBaseLong()) {
+            return s.rank();
+        } else {
+            LongIterator stepNodeIds = pathsToSteps.get(new SimplePathHandle(s.pathId())).longIterator();
+            long beginPosition = 0;
+            for (int i = 0; i < s.rank() && stepNodeIds.hasNext(); i++) {
+                beginPosition = beginPosition + sequenceOf(new SimpleNodeHandle(stepNodeIds.next())).length();
+            }
+            return beginPosition;
+        }
+    }
+
+    @Override
+    public long endPositionOfStep(SimpleStepHandle s) {
+        if (nodeToSequenceMap.areAllSequencesOneBaseLong()) {
+            return s.rank() + 1;
+        } else {
+            LongIterator stepNodeIds = pathsToSteps.get(new SimplePathHandle(s.pathId())).longIterator();
+            long endPosition = 0;
+            for (int i = 0; i < s.rank() && stepNodeIds.hasNext(); i++) {
+                endPosition = endPosition + sequenceOf(new SimpleNodeHandle(stepNodeIds.next())).length();
+            }
+            return endPosition;
+        }
+    }
+
+    @Override
+    public SimpleStepHandle stepByRankAndPath(SimplePathHandle path, long rank) {
+        long nodeIdOfStep = pathsToSteps.get(path).get((int) rank);
+        return new SimpleStepHandle(path.id(), nodeIdOfStep, rank);
+    }
+
+    @Override
+    public Stream<SimpleNodeHandle> nodesWithSequence(Sequence s) {
+        return nodeToSequenceMap.nodesIds()
+                .mapToObj(this::fromLong)
+                .filter(n -> sequenceOf(n).equals(s));
     }
 
 }

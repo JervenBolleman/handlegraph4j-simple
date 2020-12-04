@@ -36,4 +36,37 @@ public class SimpleEdgeHandle implements EdgeHandle<SimpleNodeHandle> {
         return new SimpleNodeHandle(left);
     }
 
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 83 * hash + (int) (this.left ^ (this.left >>> 32));
+        hash = 83 * hash + (int) (this.right ^ (this.right >>> 32));
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final SimpleEdgeHandle other = (SimpleEdgeHandle) obj;
+        if (this.left != other.left) {
+            return false;
+        }
+        if (this.right != other.right) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public String toString() {
+        return "SimpleEdgeHandle{" + "left=" + left + ", right=" + right + '}';
+    }
 }

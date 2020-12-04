@@ -49,6 +49,7 @@ public class SimplePathGraphFromGFA1Builder extends SimplePathGraphBuilder {
         ObjectLongHashMap<String> namesToNodeIds = new ObjectLongHashMap<>();
         parsePostPonedSegmentLines(maxNodeId, postponedSegmentLines, namesToNodeIds);
         parsePostPonedLinkLines(postponedLinkLines, namesToNodeIds);
+        nodeToSequenceMap.trim();
     }
 
     private void parsePostPonedSegmentLines(long maxNodeId, List<SegmentLine> postponedSegmentLines, ObjectLongHashMap<String> namesToNodeIds) {
