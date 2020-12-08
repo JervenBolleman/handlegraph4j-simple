@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package sib.swiss.swissprot.handlegraph4j.simple;
+package swiss.sib.swissprot.handlegraph4j.simple;
 
 import io.github.vgteam.handlegraph4j.StepHandle;
 

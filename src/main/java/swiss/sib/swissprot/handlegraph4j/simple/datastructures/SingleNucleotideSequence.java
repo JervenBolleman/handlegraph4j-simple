@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package sib.swiss.swissprot.handlegraph4j.simple.datastructures;
+package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import io.github.vgteam.handlegraph4j.sequences.SequenceType;
@@ -40,8 +40,32 @@ public class SingleNucleotideSequence implements Sequence {
     }
 
     @Override
-    public Sequence reverseCompliment() {
-        return new SingleNucleotideSequence(Sequence.compliment(nucleotide));
+    public Sequence reverseComplement() {
+        return new SingleNucleotideSequence(Sequence.complement(nucleotide));
     }
 
+    @Override
+    public int hashCode() {
+        return Sequence.hashCode(this);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        } else if (obj instanceof SingleNucleotideSequence) {
+            SingleNucleotideSequence other = (SingleNucleotideSequence) obj;
+            return this.nucleotide == other.nucleotide;
+        } else if (obj instanceof Sequence) {
+            return Sequence.equalByBytes(this, (Sequence) obj);
+        }
+        return false;
+    }
+
+    @Override
+    public String toString() {
+        return Character.toString(nucleotide);
+    }
+    
+    
 }

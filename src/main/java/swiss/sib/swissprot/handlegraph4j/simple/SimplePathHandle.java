@@ -3,30 +3,30 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package sib.swiss.swissprot.handlegraph4j.simple;
+package swiss.sib.swissprot.handlegraph4j.simple;
 
-import io.github.vgteam.handlegraph4j.NodeHandle;
+import io.github.vgteam.handlegraph4j.PathHandle;
 
 /**
  *
  * @author Jerven Bolleman <jerven.bolleman@sib.swiss>
  */
-public final class SimpleNodeHandle implements NodeHandle{
+public final class SimplePathHandle implements PathHandle{
 
-    private final long nodeId;
+    private final int pathId;
 
-    public SimpleNodeHandle(long nodeId) {
-        this.nodeId = nodeId;
+    public SimplePathHandle(int pathId) {
+        this.pathId = pathId;
     }
 
-    public long id() {
-        return nodeId;
+    public int id() {
+        return pathId;
     }
 
     @Override
     public int hashCode() {
-        int hash = 3;
-        hash = 41 * hash + (int) (this.nodeId ^ (this.nodeId >>> 32));
+        int hash = 5;
+        hash = 71 * hash + this.pathId;
         return hash;
     }
 
@@ -41,8 +41,8 @@ public final class SimpleNodeHandle implements NodeHandle{
         if (getClass() != obj.getClass()) {
             return false;
         }
-        final SimpleNodeHandle other = (SimpleNodeHandle) obj;
-        if (this.nodeId != other.nodeId) {
+        final SimplePathHandle other = (SimplePathHandle) obj;
+        if (this.pathId != other.pathId) {
             return false;
         }
         return true;

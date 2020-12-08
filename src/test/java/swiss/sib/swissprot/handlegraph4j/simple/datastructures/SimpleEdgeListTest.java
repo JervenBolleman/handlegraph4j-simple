@@ -3,13 +3,14 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package sib.swiss.swissprot.handlegraph4j.simple.datastructures;
+package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
+import swiss.sib.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-import sib.swiss.swissprot.handlegraph4j.simple.SimpleEdgeHandle;
-import sib.swiss.swissprot.handlegraph4j.simple.SimpleNodeHandle;
+import swiss.sib.swissprot.handlegraph4j.simple.SimpleEdgeHandle;
+import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 
 /**
  *
@@ -78,6 +79,7 @@ public class SimpleEdgeListTest {
             }
             assertFalse(iterator.hasNext());
         }
+        assertFalse(instance.isNotSorted());
     }
 
     private SimpleEdgeList edgeListFromLongArray(long[] field) {

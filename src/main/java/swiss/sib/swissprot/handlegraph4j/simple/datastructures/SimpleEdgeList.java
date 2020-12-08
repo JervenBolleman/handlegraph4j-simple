@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package sib.swiss.swissprot.handlegraph4j.simple.datastructures;
+package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
 import java.util.Arrays;
 import java.util.Iterator;
@@ -11,9 +11,8 @@ import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import sib.swiss.swissprot.handlegraph4j.simple.SimpleEdgeHandle;
-import sib.swiss.swissprot.handlegraph4j.simple.SimpleNodeHandle;
-import sib.swiss.swissprot.handlegraph4j.simple.SimpleStepHandle;
+import swiss.sib.swissprot.handlegraph4j.simple.SimpleEdgeHandle;
+import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 
 /**
  *
@@ -32,11 +31,16 @@ public class SimpleEdgeList {
 
     private void growIfNeeded() {
         if (size == edges.length) {
-            long[] newEdges = new long[edges.length * 2];
+            int newSize = edges.length * 2;
+            if (edges.length > FIXED_SIZE_INCREMENT) {
+                newSize = edges.length + FIXED_SIZE_INCREMENT;
+            }
+            long[] newEdges = new long[newSize];
             System.arraycopy(edges, 0, newEdges, 0, edges.length);
             edges = newEdges;
         }
     }
+    private static final int FIXED_SIZE_INCREMENT = 1024 * 1024 * 16;
 
     public void add(long left, long right) {
         edges[size++] = left;
@@ -67,7 +71,7 @@ public class SimpleEdgeList {
      * Quick implementation before implementing a proper in place sort.
      */
     private void stupidSort() {
-        if (size != 0) {
+        if (size != 0 && isNotSorted()) {
             edges = stupidSortInKeyOrder();
             stupidSortKeyValueOrder();
         }
@@ -154,6 +158,31 @@ public class SimpleEdgeList {
 
     public Stream<SimpleEdgeHandle> streamToRight(SimpleNodeHandle right) {
         return stream().filter(e -> e.right().equals(right));
+    }
+
+    public void resize(int maxEdges) {
+        long[] newEdges = new long[maxEdges * 2];
+        System.arraycopy(edges, 0, newEdges, 0, newEdges.length);
+        edges = newEdges;
+    }
+
+    boolean isNotSorted() {
+        long prevKey = edges[0];
+        long prevValue = edges[1];
+        for (int i = 2; i < edges.length;) {
+            long currentKey = edges[i++];
+            long currentValue = edges[i++];
+            if (currentKey < prevKey) {
+                return true;
+            } else if (currentKey == prevKey) {
+                if (currentValue < prevValue) {
+                    return true;
+                }
+            }
+            prevKey = currentKey;
+            prevValue = currentValue;
+        }
+        return false;
     }
 
     private class EdgeHandleIteratorImpl implements Iterator<SimpleEdgeHandle> {
