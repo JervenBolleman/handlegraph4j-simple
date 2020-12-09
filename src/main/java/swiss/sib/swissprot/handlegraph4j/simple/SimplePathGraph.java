@@ -8,6 +8,7 @@ package swiss.sib.swissprot.handlegraph4j.simple;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
 import io.github.vgteam.handlegraph4j.PathGraph;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -49,7 +50,8 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
 
     @Override
     public Stream<SimpleStepHandle> steps() {
-        return paths.values().stream().flatMap(this::stepsOf);
+        return paths.values().stream()
+                .flatMap(this::stepsOf);
     }
 
     @Override
@@ -57,7 +59,7 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
         long[] stepsOfPath = pathsToSteps.get(ph);
         if (stepsOfPath != null) {
             StepHandleIteratorImpl stepHandleIteratorImpl = new StepHandleIteratorImpl(stepsOfPath, ph.id());
-            Spliterator<SimpleStepHandle> spliterator = Spliterators.spliterator(stepHandleIteratorImpl, pathsToSteps.size(), Spliterator.SIZED);
+            Spliterator<SimpleStepHandle> spliterator = Spliterators.spliterator(stepHandleIteratorImpl, pathsToSteps.size(), 0);
             return StreamSupport.stream(spliterator, false);
         } else {
             return Stream.empty();

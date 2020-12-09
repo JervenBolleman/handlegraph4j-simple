@@ -72,7 +72,7 @@ public class SimplePathGraphFromGFA1Builder extends SimplePathGraphBuilder {
     private void reparseTempEdges(Path tempFile, AtomicInteger edgeCount) throws IOException {
         
         preSort(tempFile);
-        edges.resize(edgeCount.get() + 1);
+//        edges.resize(edgeCount.get() + 1);
         try ( Stream<String> lines = Files.lines(tempFile, US_ASCII)) {
             Consumer<String> lineToEdge = l -> {
                 int indexOf = l.indexOf('\t');

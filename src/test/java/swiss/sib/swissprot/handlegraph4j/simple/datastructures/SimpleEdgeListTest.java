@@ -5,7 +5,6 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,6 +28,7 @@ public class SimpleEdgeListTest {
         SimpleEdgeHandle eh = new SimpleEdgeHandle(1, 2);
         SimpleEdgeList instance = new SimpleEdgeList();
         instance.add(eh);
+        instance.trimAndSort();
         try ( Stream<SimpleEdgeHandle> stream = instance.stream()) {
             var iterator = stream.iterator();
             assertTrue(iterator.hasNext());
@@ -47,6 +47,7 @@ public class SimpleEdgeListTest {
         long right = 2L;
         SimpleEdgeList instance = new SimpleEdgeList();
         instance.add(left, right);
+        instance.trimAndSort();
         try ( Stream<SimpleEdgeHandle> stream = instance.stream()) {
             var iterator = stream.iterator();
             assertTrue(iterator.hasNext());
@@ -64,7 +65,6 @@ public class SimpleEdgeListTest {
         testTrimAndSortByArray(new long[]{1, -1, 2, -2, 3, -4, 2, -3}, new long[]{1, -1, 2, -3, 2, -2, 3, -4});
         testTrimAndSortByArray(new long[]{1, -1, 2, -2, 3, -3}, expected);
         testTrimAndSortByArray(new long[]{1, -1, 3, -3, 2, -2}, expected);
-
     }
 
     private void testTrimAndSortByArray(long[] field, long[] expected) throws Exception {
@@ -79,7 +79,7 @@ public class SimpleEdgeListTest {
             }
             assertFalse(iterator.hasNext());
         }
-        assertFalse(instance.isNotSorted());
+//        assertFalse(instance.isNotSorted());
     }
 
     private SimpleEdgeList edgeListFromLongArray(long[] field) {
@@ -94,23 +94,36 @@ public class SimpleEdgeListTest {
      * Test of iterator method, of class SimpleEdgeList.
      */
     @Test
-    public void testIterator() {
+    public void testSmallIterator() {
         SimpleEdgeList instance = new SimpleEdgeList();
+
         int length = 10;
+        testIterator(length, instance);
+    }
+
+    private void testIterator(int length, SimpleEdgeList instance) {
         for (int i = 0; i < length;) {
             SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, ++i);
             instance.add(eh);
         }
-
+        instance.trimAndSort();
         try ( Stream<SimpleEdgeHandle> stream = instance.stream()) {
             var iterator = stream.iterator();
             for (int i = 0; i < length;) {
-                assertTrue(iterator.hasNext());
+                assertTrue(iterator.hasNext(), " at " + i);
                 SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, ++i);
-                assertEquals(eh, iterator.next());
+                assertEquals(eh, iterator.next(), " at " + i);
             }
             assertFalse(iterator.hasNext());
         }
+    }
+
+    @Test
+    public void testBigValueIterator() {
+        SimpleEdgeList instance = new SimpleEdgeList();
+
+        int length = SimpleEdgeList.CHUNK_SIZE * 3;
+        testIterator(length, instance);
     }
 
     /**
@@ -120,36 +133,21 @@ public class SimpleEdgeListTest {
     public void testIteratorGoingLeftWithEarlyTermination() throws Exception {
         SimpleEdgeList instance = new SimpleEdgeList();
         int length = 10;
-        for (int i = 0; i < length;) {
-            SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, ++i);
-            instance.add(eh);
-        }
-        try ( Stream<SimpleEdgeHandle> stream = instance.streamToLeft(new SimpleNodeHandle(1))) {
-            var iterator = stream.iterator();
-            for (int i = 0; i < length;) {
-                assertTrue(iterator.hasNext());
-                SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, ++i);
-                assertEquals(eh, iterator.next());
-            }
-            assertFalse(iterator.hasNext());
-        }
+        testIterator(length, instance);
 
         try ( var stream = instance.streamToLeft(new SimpleNodeHandle(1))) {
             var iterator = stream.iterator();
             assertTrue(iterator.hasNext());
             SimpleEdgeHandle eh = new SimpleEdgeHandle(1, 2);
             assertEquals(eh, iterator.next());
-            assertTrue(iterator.hasNext());
+            assertFalse(iterator.hasNext());
         }
 
         try ( var stream = instance.streamToLeft(new SimpleNodeHandle(3))) {
             var iterator = stream.iterator();
             assertTrue(iterator.hasNext());
-            for (int i = 2; i < length;) {
-                assertTrue(iterator.hasNext());
-                SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, ++i);
-                assertEquals(eh, iterator.next());
-            }
+            SimpleEdgeHandle eh = new SimpleEdgeHandle(3, 4);
+            assertEquals(eh, iterator.next());
             assertFalse(iterator.hasNext());
         }
     }
@@ -162,6 +160,7 @@ public class SimpleEdgeListTest {
             SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, ++i);
             instance.add(eh);
         }
+        instance.trimAndSort();
         try ( var stream = instance.streamToRight(new SimpleNodeHandle(2))) {
             var iterator = stream.iterator();
             assertTrue(iterator.hasNext());
