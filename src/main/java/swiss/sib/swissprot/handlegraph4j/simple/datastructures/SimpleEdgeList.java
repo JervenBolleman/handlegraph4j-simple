@@ -6,7 +6,11 @@
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
 import java.util.Comparator;
+import java.util.Iterator;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleEdgeHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 
@@ -15,8 +19,9 @@ import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
  * @author Jerven Bolleman <jerven.bolleman@sib.swiss>
  */
 public class SimpleEdgeList {
+    
     private final LongLongSpinalList<SimpleEdgeHandle> kv;
-
+    
     public SimpleEdgeList() {
         this.kv = new LongLongSpinalList<>(
                 SimpleEdgeHandle::new,
@@ -24,32 +29,37 @@ public class SimpleEdgeList {
                 s -> s.right().id(),
                 new LeftThenRightOrder());
     }
-
+    
     public void add(SimpleEdgeHandle eh) {
         kv.add(eh);
     }
-
+    
     public void trimAndSort() {
         kv.trimAndSort();
     }
-
-    public Stream<SimpleEdgeHandle> stream() {
-        return kv.stream();
+    
+    public Iterator<SimpleEdgeHandle> iterator() {
+        return kv.iterator();
     }
-
+    
+    public Stream<SimpleEdgeHandle> stream() {
+        var si = Spliterators.spliteratorUnknownSize(kv.iterator(), 0);
+        return StreamSupport.stream(si, false);
+    }
+    
     public Stream<SimpleEdgeHandle> streamToLeft(SimpleNodeHandle left) {
         return kv.streamToLeft(left.id());
     }
-
+    
     public Stream<SimpleEdgeHandle> streamToRight(SimpleNodeHandle right) {
         return stream().filter(e -> e.right().equals(right));
     }
-
+    
     private static class LeftThenRightOrder implements Comparator<SimpleEdgeHandle> {
-
+        
         public LeftThenRightOrder() {
         }
-
+        
         @Override
         public int compare(SimpleEdgeHandle l, SimpleEdgeHandle r) {
             int cl = Long.compare(l.left().id(), r.left().id());

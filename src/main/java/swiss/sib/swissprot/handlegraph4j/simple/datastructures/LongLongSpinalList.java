@@ -5,12 +5,17 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
+import io.github.vgteam.handlegraph4j.sequences.AutoClosedIterator;
+import static java.util.Spliterators.spliteratorUnknownSize;
+import static java.util.Spliterator.NONNULL;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.PrimitiveIterator.OfLong;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BiFunction;
@@ -26,6 +31,7 @@ import me.lemire.integercompression.differential.IntegratedIntCompressor;
 /**
  *
  * @author Jerven Bolleman <jerven.bolleman@sib.swiss>
+ * @param <T> the type of object representated by this key value store
  */
 public class LongLongSpinalList<T> {
 
@@ -50,6 +56,13 @@ public class LongLongSpinalList<T> {
     public Stream<T> stream() {
         return chunks.stream()
                 .flatMap(Chunk::stream);
+    }
+
+    public Iterator<T> iterator() {
+        Iterator<Iterator<T>> iterator = chunks.stream()
+                .map(Chunk::iterator)
+                .iterator();
+        return new AutoClosedIterator.CollectingOfIterator<>(iterator);
     }
 
     public void trimAndSort() {
@@ -167,6 +180,16 @@ public class LongLongSpinalList<T> {
                 .flatMapToLong(c -> c.streamKeys());
     }
 
+    public OfLong keyIterator() {
+        Iterator<OfLong> iter = chunks
+                .stream()
+                .map(Chunk::keyIterator)
+                .collect(Collectors.toList())
+                .iterator();
+
+        return new AutoClosedIterator.CollectingOfLong(iter);
+    }
+
     public long size() {
         return chunks.stream()
                 .mapToLong(c -> c.size())
@@ -183,7 +206,11 @@ public class LongLongSpinalList<T> {
 
         public Stream<T> stream();
 
+        public Iterator<T> iterator();
+
         public LongStream streamKeys();
+
+        public OfLong keyIterator();
 
         T first();
 
@@ -282,6 +309,11 @@ public class LongLongSpinalList<T> {
         }
 
         @Override
+        public Iterator<T> iterator() {
+            return stream().iterator();
+        }
+
+        @Override
         public LongStream streamKeys() {
             int[] intkeys = new IntegratedIntCompressor().uncompress(compressedKeys);
             IntStream rawkeys = Arrays.stream(intkeys);
@@ -294,11 +326,44 @@ public class LongLongSpinalList<T> {
         }
 
         @Override
+        public OfLong keyIterator() {
+            int[] intkeys = new IntegratedIntCompressor().uncompress(compressedKeys);
+            return new OfLong() {
+                int cursor = 0;
+
+                int currentInt() {
+                    if (cursor == 0) {
+                        return firstKey;
+                    } else if (cursor == intkeys.length) {
+                        return lastKey;
+                    } else {
+                        int intkey = intkeys[cursor - 1];
+                        return intkey;
+                    }
+                }
+
+                @Override
+                public long nextLong() {
+                    long rotateLeft = rotateLeft(currentInt());
+                    cursor++;
+                    return rotateLeft;
+                }
+
+                @Override
+                public boolean hasNext() {
+                    return cursor < intkeys.length + 2;
+                }
+            };
+        }
+
+        @Override
         public T first() {
             return reconstruct(firstKey, firstValue, reconstructor);
         }
 
-        private T reconstruct(int left, int right, BiFunction<Long, Long, T> reconstructor) {
+        private T reconstruct(int left,
+                int right,
+                BiFunction<Long, Long, T> reconstructor) {
             long leftId = rotateLeft(left);
             long rightId = rotateLeft(right);
             return reconstructor.apply(leftId, rightId);
@@ -326,7 +391,9 @@ public class LongLongSpinalList<T> {
             private final int[] values;
             private final BiFunction<Long, Long, T> reconstructor;
 
-            public Decompressing(int[] lefts, int[] rights, BiFunction<Long, Long, T> reconstructor) {
+            public Decompressing(int[] lefts,
+                    int[] rights,
+                    BiFunction<Long, Long, T> reconstructor) {
                 this.keys = new IntegratedIntCompressor().uncompress(lefts);
                 this.values = new IntCompressor().uncompress(rights);
                 this.reconstructor = reconstructor;
@@ -353,7 +420,6 @@ public class LongLongSpinalList<T> {
         private long[] keys = new long[CHUNK_SIZE];
         private long[] values = new long[CHUNK_SIZE];
         private int size = 0;
-        private boolean sorted = false;
         private final BiFunction<Long, Long, T> reconstructor;
         private final Function<T, Long> getKey;
         private final Function<T, Long> getValue;
@@ -395,27 +461,42 @@ public class LongLongSpinalList<T> {
                 keys = sortedKeys;
                 values = sortedValues;
             }
-            sorted = true;
         }
 
         private void add(T t) {
             keys[size] = getKey.apply(t);
             values[size] = getValue.apply(t);
             size++;
-            sorted = false;
         }
 
         @Override
         public Stream<T> stream() {
             //start from zero do not early terminate
             var edgesIter = new BasicChunkIterator(size, keys, values);
-//            int characteristics = Spliterator.SIZED | Spliterator.SUBSIZED
-//                    | Spliterator.NONNULL;
-//            if (!sorted) {
-//                characteristics = 0;
-//            }
-            var spliterator = Spliterators.spliterator(edgesIter, Long.MAX_VALUE, 0);
+            var spliterator = spliteratorUnknownSize(edgesIter, NONNULL);
             return StreamSupport.stream(spliterator, false);
+        }
+
+        @Override
+        public Iterator<T> iterator() {
+            return stream().iterator();
+        }
+
+        @Override
+        public OfLong keyIterator() {
+            return new OfLong() {
+                int cursor = 0;
+
+                @Override
+                public long nextLong() {
+                    return keys[cursor++];
+                }
+
+                @Override
+                public boolean hasNext() {
+                    return cursor < keys.length;
+                }
+            };
         }
 
         @Override
@@ -436,13 +517,6 @@ public class LongLongSpinalList<T> {
         @Override
         public LongStream streamKeys() {
             return Arrays.stream(keys);
-        }
-
-        private void trim() {
-            if (values.length != size) {
-                values = Arrays.copyOf(values, size);
-                keys = Arrays.copyOf(keys, size);
-            }
         }
 
         @Override
@@ -477,12 +551,10 @@ public class LongLongSpinalList<T> {
         }
     }
 
-    private static <T> int compareChunksByFirstKey(Chunk<T> l, Chunk<T> r) {
-        return Long.compare(l.firstKey(), r.firstKey());
-    }
-
     private static class SearchChunk<T> implements Chunk<T> {
 
+        private static final String NOT_SUPPORTED
+                = "Not supported, this is just for the binary search.";
         private final long key;
 
         public SearchChunk(long key) {
@@ -491,37 +563,47 @@ public class LongLongSpinalList<T> {
 
         @Override
         public long size() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
         }
 
         @Override
         public boolean isFull() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
         }
 
         @Override
         public void sort() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
         }
 
         @Override
         public Stream<T> stream() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
         }
 
         @Override
         public LongStream streamKeys() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
         }
 
         @Override
         public T first() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
         }
 
         @Override
         public T last() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
+        }
+
+        @Override
+        public OfLong keyIterator() {
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
+        }
+
+        @Override
+        public Iterator<T> iterator() {
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
         }
 
         @Override
@@ -530,4 +612,6 @@ public class LongLongSpinalList<T> {
         }
 
     }
+
+    
 }

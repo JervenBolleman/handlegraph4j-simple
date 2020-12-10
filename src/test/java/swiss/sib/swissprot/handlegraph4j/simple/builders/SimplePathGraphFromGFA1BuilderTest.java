@@ -5,12 +5,10 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.builders;
 
-import swiss.sib.swissprot.handlegraph4j.simple.builders.SimplePathGraphFromGFA1Builder;
 import io.github.vgteam.handlegraph4j.gfa1.GFA1Reader;
 import java.util.Arrays;
 import java.util.PrimitiveIterator;
 import java.util.stream.LongStream;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathGraph;
@@ -76,15 +74,13 @@ public class SimplePathGraphFromGFA1BuilderTest {
         instance.parse(gFA1Reader);
         SimplePathGraph graph = instance.build();
         assertFalse(graph.isEmpty());
-        try ( Stream<SimplePathHandle> pathsS = graph.paths()) {
-            var paths = pathsS.iterator();
+        try ( var paths = graph.paths()) {
             assertTrue(paths.hasNext());
             SimplePathHandle path = paths.next();
             assertNotNull(path);
             assertEquals("x", graph.nameOfPath(path));
 
-            try ( Stream<SimpleStepHandle> stepsS = graph.stepsOf(path)) {
-                var steps = stepsS.iterator();
+            try ( var steps = graph.stepsOf(path)) {
                 int[] expectedNodeIds = new int[]{1, 3, 5, 6, 8, 9, 11, 12, 14, 15, 3};
                 int expectedRank = 0;
                 for (int expectedNodeId : expectedNodeIds) {
@@ -115,8 +111,7 @@ public class SimplePathGraphFromGFA1BuilderTest {
         instance.parse(gFA1Reader);
         SimplePathGraph graph = instance.build();
         assertFalse(graph.isEmpty());
-        try ( Stream<SimplePathHandle> pathsS = graph.paths()) {
-            var paths = pathsS.iterator();
+        try ( var paths = graph.paths()) {
             assertTrue(paths.hasNext());
             SimplePathHandle path = paths.next();
             assertNotNull(path);
@@ -152,7 +147,12 @@ public class SimplePathGraphFromGFA1BuilderTest {
         SimplePathGraph graph = instance.build();
         assertFalse(graph.isEmpty());
         try ( var nodes = graph.nodes()) {
-            assertEquals(15, nodes.count());
+            long count = 0;
+            while (nodes.hasNext()) {
+                assertNotNull(nodes.next());
+                count++;
+            }
+            assertEquals(15, count);
         }
     }
 }

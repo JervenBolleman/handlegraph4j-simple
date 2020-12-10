@@ -7,21 +7,19 @@ package swiss.sib.swissprot.handlegraph4j.simple;
 
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
 import io.github.vgteam.handlegraph4j.PathGraph;
+import io.github.vgteam.handlegraph4j.sequences.AutoClosedIterator;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PrimitiveIterator;
-import java.util.Spliterator;
 import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import static java.util.Spliterator.SIZED;
-import java.util.Spliterators;
 import static java.util.Spliterators.spliterator;
 import java.util.stream.LongStream;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.NodeToSequenceMap;
 
@@ -44,25 +42,37 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     }
 
     @Override
-    public Stream<SimplePathHandle> paths() {
-        return paths.values().stream();
+    public AutoClosedIterator<SimplePathHandle> paths() {
+        return AutoClosedIterator.from(paths.values().iterator());
     }
 
     @Override
-    public Stream<SimpleStepHandle> steps() {
-        return paths.values().stream()
-                .flatMap(this::stepsOf);
+    public AutoClosedIterator<SimpleStepHandle> steps() {
+        var p = paths.values().iterator();
+        var i = new Iterator<Iterator<SimpleStepHandle>>() {
+
+            @Override
+            public boolean hasNext() {
+                return p.hasNext();
+            }
+
+            @Override
+            public Iterator<SimpleStepHandle> next() {
+                return stepsOf(p.next());
+            }
+        };
+        var ci = new AutoClosedIterator.CollectingOfIterator(i);
+        return AutoClosedIterator.from(ci);
     }
 
     @Override
-    public Stream<SimpleStepHandle> stepsOf(SimplePathHandle ph) {
+    public AutoClosedIterator<SimpleStepHandle> stepsOf(SimplePathHandle ph) {
         long[] stepsOfPath = pathsToSteps.get(ph);
         if (stepsOfPath != null) {
-            StepHandleIteratorImpl stepHandleIteratorImpl = new StepHandleIteratorImpl(stepsOfPath, ph.id());
-            Spliterator<SimpleStepHandle> spliterator = Spliterators.spliterator(stepHandleIteratorImpl, pathsToSteps.size(), 0);
-            return StreamSupport.stream(spliterator, false);
+            var i = new StepHandleIteratorImpl(stepsOfPath, ph.id());
+            return AutoClosedIterator.from(i);
         } else {
-            return Stream.empty();
+            return AutoClosedIterator.from(Collections.emptyIterator());
         }
     }
 
@@ -92,23 +102,25 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     }
 
     @Override
-    public Stream<SimpleEdgeHandle> followEdgesToWardsTheRight(SimpleNodeHandle left) {
-        return edges.streamToLeft(left);
+    public AutoClosedIterator<SimpleEdgeHandle> followEdgesToWardsTheRight(SimpleNodeHandle left) {
+        var i = edges.streamToLeft(left).iterator();
+        return AutoClosedIterator.from(i);
     }
 
     @Override
-    public Stream<SimpleEdgeHandle> followEdgesToWardsTheLeft(SimpleNodeHandle right) {
-        return edges.streamToRight(right);
+    public AutoClosedIterator<SimpleEdgeHandle> followEdgesToWardsTheLeft(SimpleNodeHandle right) {
+        var i = edges.streamToRight(right).iterator();
+        return AutoClosedIterator.from(i);
     }
 
     @Override
-    public Stream<SimpleEdgeHandle> edges() {
-        return edges.stream();
+    public AutoClosedIterator<SimpleEdgeHandle> edges() {
+        return AutoClosedIterator.from(edges.iterator());
     }
 
     @Override
-    public Stream<SimpleNodeHandle> nodes() {
-        return nodeToSequenceMap.nodes();
+    public AutoClosedIterator<SimpleNodeHandle> nodes() {
+        return AutoClosedIterator.from(nodeToSequenceMap.nodeIterator());
     }
 
     @Override
@@ -226,10 +238,11 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     }
 
     @Override
-    public Stream<SimpleNodeHandle> nodesWithSequence(Sequence s) {
-        return nodeToSequenceMap.nodesIds()
+    public AutoClosedIterator<SimpleNodeHandle> nodesWithSequence(Sequence s) {
+        var i = nodeToSequenceMap.nodesIds()
                 .mapToObj(this::fromLong)
-                .filter(n -> sequenceOf(n).equals(s));
+                .filter(n -> sequenceOf(n).equals(s)).iterator();
+        return AutoClosedIterator.from(i);
     }
 
     @Override

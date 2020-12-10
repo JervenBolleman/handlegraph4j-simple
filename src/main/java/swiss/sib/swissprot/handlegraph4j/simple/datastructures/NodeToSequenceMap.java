@@ -5,11 +5,10 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
+import io.github.vgteam.handlegraph4j.sequences.AutoClosedIterator;
 import io.github.vgteam.handlegraph4j.sequences.LongSequence;
-import static java.util.Spliterators.spliterator;
-import static java.util.Spliterator.SIZED;
+import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.Spliterator.NONNULL;
-import static java.util.Spliterator.SUBSIZED;
 import static java.util.Spliterator.ORDERED;
 import static java.util.Spliterator.DISTINCT;
 
@@ -17,15 +16,15 @@ import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import io.github.vgteam.handlegraph4j.sequences.SequenceType;
 import io.github.vgteam.handlegraph4j.sequences.ShortAmbiguousSequence;
 import io.github.vgteam.handlegraph4j.sequences.ShortKnownSequence;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Optional;
-import java.util.PrimitiveIterator;
-import java.util.function.Function;
+import java.util.PrimitiveIterator.OfLong;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -33,7 +32,6 @@ import org.eclipse.collections.api.LazyLongIterable;
 import org.eclipse.collections.api.iterator.LongIterator;
 import org.eclipse.collections.impl.list.mutable.primitive.LongArrayList;
 import org.eclipse.collections.impl.map.mutable.primitive.LongIntHashMap;
-import org.eclipse.collections.impl.map.mutable.primitive.LongLongHashMap;
 import org.roaringbitmap.longlong.Roaring64Bitmap;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 
@@ -68,15 +66,15 @@ public class NodeToSequenceMap {
             return sequence;
         }
     }
-    
+
     private static class NodeSequenceComparator implements
-            Comparator<NodeSequence>{
+            Comparator<NodeSequence> {
 
         @Override
         public int compare(NodeSequence o1, NodeSequence o2) {
-             return Long.compare(o1.nodeId(), o2.nodeId());
+            return Long.compare(o1.nodeId(), o2.nodeId());
         }
-        
+
     }
 
     public NodeToSequenceMap() {
@@ -118,6 +116,22 @@ public class NodeToSequenceMap {
     public Stream<SimpleNodeHandle> nodes() {
         return nodesIds()
                 .mapToObj(id -> new SimpleNodeHandle(id));
+    }
+
+    public Iterator<SimpleNodeHandle> nodeIterator() {
+        OfLong ids = nodeIdsIterator();
+        return new Iterator<SimpleNodeHandle>() {
+            @Override
+            public boolean hasNext() {
+                return ids.hasNext();
+            }
+
+            @Override
+            public SimpleNodeHandle next() {
+                long id = ids.nextLong();
+                return new SimpleNodeHandle(id);
+            }
+        };
     }
 
     public Sequence getSequence(SimpleNodeHandle handle) {
@@ -214,42 +228,64 @@ public class NodeToSequenceMap {
     }
 
     public LongStream nodesIds() {
-        return Stream.of(
-                fewNps.values()
-                        .stream()
-                        .flatMapToLong(this::nodeIdsFromBitMap),
-                nodeIdsFromNodeToSequenceMap(),
-                nodeIdsFromSequenceMap())
-                .flatMapToLong(Function.identity());
+        return streamFromOfLong(nodeIdsIterator());
+    }
+
+    public OfLong nodeIdsIterator() {
+        var nssm = nodeToShortSequenceMap.keyIterator();
+        LongIterator nlsmli = nodeToLongSequencePositionMap.keysView().longIterator();
+        var nlsm = fromLongIterator(nlsmli);
+        List<OfLong> li = new ArrayList<>();
+
+        for (Roaring64Bitmap r : fewNps.values()) {
+            li.add(iteratorFromBitMap(r));
+        }
+        li.add(nssm);
+        li.add(nlsm);
+        return new AutoClosedIterator.CollectingOfLong(li.iterator());
+    }
+
+    private OfLong fromLongIterator(LongIterator li) {
+        return new OfLong() {
+            @Override
+            public long nextLong() {
+                return li.next();
+            }
+
+            @Override
+            public boolean hasNext() {
+                return li.hasNext();
+            }
+        };
     }
 
     private LongStream nodeIdsFromBitMap(Roaring64Bitmap nodeIds) throws UnsupportedOperationException {
         if (nodeIds == null) {
             return LongStream.empty();
         } else {
-            Iterator<Long> iterator = nodeIds.iterator();
-            return streamFromBitMap(iterator, nodeIds);
+            var iterator = iteratorFromBitMap(nodeIds);
+            return streamFromOfLong(iterator);
         }
     }
 
-    private LongStream streamFromBitMap(Iterator<Long> iterator, Roaring64Bitmap nodeIds) throws UnsupportedOperationException {
-        var primitiveIter = new PrimitiveIterator.OfLong() {
-
+    private OfLong iteratorFromBitMap(Roaring64Bitmap nodeIds) {
+        var longIterator = nodeIds.getLongIterator();
+        return new OfLong() {
             @Override
             public long nextLong() {
-                return iterator.next();
+                return longIterator.next();
             }
 
             @Override
             public boolean hasNext() {
-                return iterator.hasNext();
+                return longIterator.hasNext();
             }
-
         };
+    }
 
-        var si = spliterator(primitiveIter,
-                nodeIds.getIntCardinality(),
-                SIZED | ORDERED | DISTINCT | NONNULL | SUBSIZED);
+    private LongStream streamFromOfLong(OfLong iterator) throws UnsupportedOperationException {
+        var si = spliteratorUnknownSize(iterator,
+                ORDERED | DISTINCT | NONNULL);
         return StreamSupport.longStream(si, false);
     }
 
@@ -264,7 +300,7 @@ public class NodeToSequenceMap {
     }
 
     private LongStream longIteratorToStream(LongIterator longIterator, long size) {
-        var primitiveIter = new PrimitiveIterator.OfLong() {
+        var primitiveIter = new OfLong() {
 
             @Override
             public long nextLong() {
@@ -276,9 +312,7 @@ public class NodeToSequenceMap {
                 return longIterator.hasNext();
             }
         };
-        var si = spliterator(primitiveIter,
-                size,
-                SIZED | NONNULL | SUBSIZED);
+        var si = spliteratorUnknownSize(primitiveIter, NONNULL);
         return StreamSupport.longStream(si, false);
     }
 
