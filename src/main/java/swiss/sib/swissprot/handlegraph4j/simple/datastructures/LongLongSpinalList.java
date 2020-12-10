@@ -7,6 +7,7 @@ package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -60,12 +61,18 @@ public class LongLongSpinalList<T> {
     }
 
     public Stream<T> streamToLeft(long key) {
+        int index = 0;
+        if (chunks.size() > 1) {
+            index = findFirstChunkThatMightMatch(key);
+        }
+
         return chunks.stream()
+                .skip(index)
                 .filter(c -> {
                     long fetchedKey = getKey.apply(c.first());
                     return key >= fetchedKey;
                 })
-                .filter(c -> {
+                .takeWhile(c -> {
                     long fetchedKey = getKey.apply(c.last());
                     return key <= fetchedKey;
                 })
@@ -75,6 +82,32 @@ public class LongLongSpinalList<T> {
                     return fetchedKey == key;
                 }
                 );
+    }
+
+    private int findFirstChunkThatMightMatch(long key) {
+        int index = Collections.binarySearch(chunks,
+                new SearchChunk<>(key),
+                (l, r) -> Long.compare(l.firstKey(), r.firstKey()));
+        if (index > 0) {
+            //We might need to backtrack as we found a chunck in which
+            //have the key, but chunks that are before this one might have the
+            //key as well
+            while (index > 0 && chunks.get(index - 1).firstKey() == key) {
+                index--;
+            }
+        } else if (index < 0) {
+            index = Math.abs(index + 1);
+            //If the insertion spot is after the last chunk the 
+            //content can only be in the last chunk
+            if (index >= chunks.size()) {
+                return chunks.size() - 1;
+            }
+            //Make sure that we do not need to go to an earlier chunk
+            while (index > 0 && chunks.get(index).firstKey() > key) {
+                index--;
+            }
+        }
+        return index;
     }
 
     void sort() {
@@ -131,7 +164,7 @@ public class LongLongSpinalList<T> {
 
     public LongStream keyStream() {
         return chunks.stream()
-                .flatMapToLong(c ->c.streamKeys());
+                .flatMapToLong(c -> c.streamKeys());
     }
 
     public long size() {
@@ -149,12 +182,14 @@ public class LongLongSpinalList<T> {
         public void sort();
 
         public Stream<T> stream();
-        
+
         public LongStream streamKeys();
 
         T first();
 
         T last();
+
+        long firstKey();
     }
 
     private static class CompressedChunck<T> implements Chunk<T> {
@@ -245,7 +280,7 @@ public class LongLongSpinalList<T> {
             Stream<T> con = StreamSupport.stream(spliterator, false);
             return Stream.concat(Stream.concat(Stream.of(first()), con), Stream.of(last()));
         }
-        
+
         @Override
         public LongStream streamKeys() {
             int[] intkeys = new IntegratedIntCompressor().uncompress(compressedKeys);
@@ -253,7 +288,7 @@ public class LongLongSpinalList<T> {
             IntStream start = IntStream.of(firstKey);
             IntStream middle = IntStream.concat(start, rawkeys);
             IntStream end = IntStream.of(lastKey);
-                    
+
             return IntStream.concat(middle, end)
                     .mapToLong(CompressedChunck::rotateLeft);
         }
@@ -264,8 +299,8 @@ public class LongLongSpinalList<T> {
         }
 
         private T reconstruct(int left, int right, BiFunction<Long, Long, T> reconstructor) {
-            long leftId = rotateLeft((long) left);
-            long rightId = rotateLeft((long) right);
+            long leftId = rotateLeft(left);
+            long rightId = rotateLeft(right);
             return reconstructor.apply(leftId, rightId);
         }
 
@@ -277,6 +312,11 @@ public class LongLongSpinalList<T> {
         @Override
         public long size() {
             return CHUNK_SIZE;
+        }
+
+        @Override
+        public long firstKey() {
+            return rotateLeft(firstKey);
         }
 
         private static class Decompressing<T> implements Iterator<T> {
@@ -369,18 +409,23 @@ public class LongLongSpinalList<T> {
         public Stream<T> stream() {
             //start from zero do not early terminate
             var edgesIter = new BasicChunkIterator(size, keys, values);
-            int characteristics = Spliterator.SIZED | Spliterator.SUBSIZED
-                    | Spliterator.NONNULL;
-            if (!sorted) {
-                characteristics = 0;
-            }
-            var spliterator = Spliterators.spliterator(edgesIter, size, characteristics);
+//            int characteristics = Spliterator.SIZED | Spliterator.SUBSIZED
+//                    | Spliterator.NONNULL;
+//            if (!sorted) {
+//                characteristics = 0;
+//            }
+            var spliterator = Spliterators.spliterator(edgesIter, Long.MAX_VALUE, 0);
             return StreamSupport.stream(spliterator, false);
         }
 
         @Override
         public T first() {
             return reconstructor.apply(keys[0], values[0]);
+        }
+
+        @Override
+        public long firstKey() {
+            return keys[0];
         }
 
         @Override
@@ -430,5 +475,59 @@ public class LongLongSpinalList<T> {
                 return next;
             }
         }
+    }
+
+    private static <T> int compareChunksByFirstKey(Chunk<T> l, Chunk<T> r) {
+        return Long.compare(l.firstKey(), r.firstKey());
+    }
+
+    private static class SearchChunk<T> implements Chunk<T> {
+
+        private final long key;
+
+        public SearchChunk(long key) {
+            this.key = key;
+        }
+
+        @Override
+        public long size() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public boolean isFull() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public void sort() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public Stream<T> stream() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public LongStream streamKeys() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public T first() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public T last() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public long firstKey() {
+            return key;
+        }
+
     }
 }
