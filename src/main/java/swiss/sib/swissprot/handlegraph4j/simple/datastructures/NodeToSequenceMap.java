@@ -9,6 +9,7 @@ import io.github.vgteam.handlegraph4j.sequences.LongSequence;
 import static java.util.Spliterators.spliterator;
 import static java.util.Spliterator.SIZED;
 import static java.util.Spliterator.NONNULL;
+import static java.util.Spliterator.SUBSIZED;
 import static java.util.Spliterator.ORDERED;
 import static java.util.Spliterator.DISTINCT;
 
@@ -17,15 +18,18 @@ import io.github.vgteam.handlegraph4j.sequences.SequenceType;
 import io.github.vgteam.handlegraph4j.sequences.ShortAmbiguousSequence;
 import io.github.vgteam.handlegraph4j.sequences.ShortKnownSequence;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.PrimitiveIterator;
 import java.util.function.Function;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import org.eclipse.collections.api.LazyLongIterable;
 import org.eclipse.collections.api.iterator.LongIterator;
 import org.eclipse.collections.impl.list.mutable.primitive.LongArrayList;
 import org.eclipse.collections.impl.map.mutable.primitive.LongIntHashMap;
@@ -40,14 +44,47 @@ import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 public class NodeToSequenceMap {
 
     private final Map<Sequence, Roaring64Bitmap> fewNps = new HashMap<>();
-    private final LongLongHashMap nodeToShortSequenceMap;
+    private final LongLongSpinalList<NodeSequence> nodeToShortSequenceMap;
     private final LongIntHashMap nodeToLongSequencePositionMap;
     private final LongArrayList longSequenceLinearLayout;
     private long maxNodeId;
     private static final int FEW_NUCLEOTIDES_LIMIT = 3;
 
+    private static class NodeSequence {
+
+        private long nodeId;
+        private long sequence;
+
+        public NodeSequence(long nodeId, long sequence) {
+            this.nodeId = nodeId;
+            this.sequence = sequence;
+        }
+
+        public long nodeId() {
+            return nodeId;
+        }
+
+        public long sequence() {
+            return sequence;
+        }
+    }
+    
+    private static class NodeSequenceComparator implements
+            Comparator<NodeSequence>{
+
+        @Override
+        public int compare(NodeSequence o1, NodeSequence o2) {
+             return Long.compare(o1.nodeId(), o2.nodeId());
+        }
+        
+    }
+
     public NodeToSequenceMap() {
-        this.nodeToShortSequenceMap = new LongLongHashMap();
+        this.nodeToShortSequenceMap = new LongLongSpinalList<>(NodeSequence::new,
+                NodeSequence::nodeId,
+                NodeSequence::sequence,
+                new NodeSequenceComparator()
+        );
         this.nodeToLongSequencePositionMap = new LongIntHashMap();
         this.longSequenceLinearLayout = new LongArrayList();
         initializeVeryShortSequenceMaps();
@@ -89,18 +126,7 @@ public class NodeToSequenceMap {
                 return en.getKey();
             }
         }
-        if (nodeToShortSequenceMap.containsKey(handle.id())) {
-            long sequence = nodeToShortSequenceMap.get(handle.id());
 
-            SequenceType fromLong = SequenceType.fromLong(sequence);
-            switch (fromLong) {
-                case SHORT_KNOWN:
-                    return new ShortKnownSequence(sequence);
-                case SHORT_AMBIGUOUS:
-                    return new ShortAmbiguousSequence(sequence);
-
-            }
-        }
         if (nodeToLongSequencePositionMap.containsKey(handle.id())) {
             int offset = nodeToLongSequencePositionMap.get(handle.id());
             long sizeAndLongs = longSequenceLinearLayout.get(offset);
@@ -112,6 +138,17 @@ public class NodeToSequenceMap {
             }
             return new LongSequence(seq, (int) size);
         }
+        var s = nodeToShortSequenceMap.streamToLeft(handle.id()).findAny();
+        if (s.isPresent()) {
+            long sequence = s.get().sequence;
+            SequenceType fromLong = SequenceType.fromLong(sequence);
+            switch (fromLong) {
+                case SHORT_KNOWN:
+                    return new ShortKnownSequence(sequence);
+                case SHORT_AMBIGUOUS:
+                    return new ShortAmbiguousSequence(sequence);
+            }
+        }
         throw new IllegalStateException("A simple node handle was passed in which does not have a sequence");
     }
 
@@ -119,12 +156,14 @@ public class NodeToSequenceMap {
         maxNodeId = Math.max(maxNodeId, id);
         if (sequence.length() <= FEW_NUCLEOTIDES_LIMIT) {
             fewNps.get(sequence).addLong(id);
-        } else if (sequence.getType()
-                == SequenceType.SHORT_KNOWN) {
-            nodeToShortSequenceMap.put(id, ((ShortKnownSequence) sequence).asLong());
-        } else if (sequence.getType()
-                == SequenceType.SHORT_AMBIGUOUS) {
-            nodeToShortSequenceMap.put(id, ((ShortAmbiguousSequence) sequence).asLong());
+        } else if (sequence.getType() == SequenceType.SHORT_KNOWN) {
+            long seq = ((ShortKnownSequence) sequence).asLong();
+            var ns = new NodeSequence(id, seq);
+            nodeToShortSequenceMap.add(ns);
+        } else if (sequence.getType() == SequenceType.SHORT_AMBIGUOUS) {
+            long seq = ((ShortAmbiguousSequence) sequence).asLong();
+            var ns = new NodeSequence(id, seq);
+            nodeToShortSequenceMap.add(ns);
         } else {
             int at = longSequenceLinearLayout.size();
             int size = sequence.length();
@@ -142,7 +181,7 @@ public class NodeToSequenceMap {
     public void trim() {
         trimFewNps();
         nodeToLongSequencePositionMap.compact();
-        nodeToShortSequenceMap.compact();
+        nodeToShortSequenceMap.trimAndSort();
         longSequenceLinearLayout.trimToSize();
     }
 
@@ -210,21 +249,21 @@ public class NodeToSequenceMap {
 
         var si = spliterator(primitiveIter,
                 nodeIds.getIntCardinality(),
-                SIZED | ORDERED | DISTINCT | NONNULL);
+                SIZED | ORDERED | DISTINCT | NONNULL | SUBSIZED);
         return StreamSupport.longStream(si, false);
     }
 
     private LongStream nodeIdsFromNodeToSequenceMap() {
-        var longIterator = nodeToShortSequenceMap.keysView().longIterator();
-        return longIteratorToStream(longIterator);
+        return nodeToShortSequenceMap.keyStream();
     }
 
     private LongStream nodeIdsFromSequenceMap() {
-        var longIterator = nodeToLongSequencePositionMap.keysView().longIterator();
-        return longIteratorToStream(longIterator);
+        LazyLongIterable keysView = nodeToLongSequencePositionMap.keysView();
+        var longIterator = keysView.longIterator();
+        return longIteratorToStream(longIterator, keysView.size());
     }
 
-    private LongStream longIteratorToStream(LongIterator longIterator) {
+    private LongStream longIteratorToStream(LongIterator longIterator, long size) {
         var primitiveIter = new PrimitiveIterator.OfLong() {
 
             @Override
@@ -238,8 +277,8 @@ public class NodeToSequenceMap {
             }
         };
         var si = spliterator(primitiveIter,
-                nodeToShortSequenceMap.size(),
-                SIZED | NONNULL);
+                size,
+                SIZED | NONNULL | SUBSIZED);
         return StreamSupport.longStream(si, false);
     }
 

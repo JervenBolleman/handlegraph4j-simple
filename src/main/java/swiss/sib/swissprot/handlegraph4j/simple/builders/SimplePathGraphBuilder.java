@@ -32,6 +32,7 @@ class SimplePathGraphBuilder {
             justpaths.put(next.getKey(), next.getValue().toArray());
             iterator.remove();
         }
+        nodeToSequenceMap.trim();
         return new SimplePathGraph(nodeToSequenceMap, paths, justpaths, edges);
     }
 }

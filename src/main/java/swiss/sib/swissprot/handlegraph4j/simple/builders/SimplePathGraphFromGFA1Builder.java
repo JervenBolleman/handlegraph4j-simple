@@ -28,6 +28,7 @@ import java.util.stream.Stream;
 import org.eclipse.collections.api.list.primitive.MutableLongList;
 import org.eclipse.collections.impl.list.mutable.primitive.LongArrayList;
 import org.eclipse.collections.impl.map.mutable.primitive.ObjectLongHashMap;
+import swiss.sib.swissprot.handlegraph4j.simple.SimpleEdgeHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathHandle;
 
 /**
@@ -78,7 +79,7 @@ public class SimplePathGraphFromGFA1Builder extends SimplePathGraphBuilder {
                 int indexOf = l.indexOf('\t');
                 long from = Long.parseLong(l, 0, indexOf, RADIX);
                 long to = Long.parseLong(l, indexOf + 1, l.length(), RADIX);
-                edges.add(from, to);
+                edges.add(new SimpleEdgeHandle(from, to));
             };
             lines.forEach(lineToEdge);
         }
@@ -177,7 +178,7 @@ public class SimplePathGraphFromGFA1Builder extends SimplePathGraphBuilder {
 //                    .append('\t')
 //                    .append(Long.toString(fromNameAsLong))
 //                    .append('\n');
-            edges.add(fromNameAsLong, toNameAsLong);
+            edges.add(new SimpleEdgeHandle(fromNameAsLong, toNameAsLong));
         } catch (NumberFormatException f) {
             postponedLinkLines.add(ll);
         }
@@ -194,7 +195,7 @@ public class SimplePathGraphFromGFA1Builder extends SimplePathGraphBuilder {
             if (ll.isReverseComplimentOfFrom()) {
                 toNameAsLong = -toNameAsLong;
             }
-            edges.add(toNameAsLong, fromNameAsLong);
+            edges.add(new SimpleEdgeHandle(toNameAsLong, fromNameAsLong));
         }
     }
     

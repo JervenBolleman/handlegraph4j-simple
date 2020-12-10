@@ -41,12 +41,10 @@ public class SimpleEdgeListTest {
      * Test of add method, of class SimpleEdgeList.
      */
     @Test
-    public void testAdd_long_long() throws Exception {
+    public void testAdd_long_long() {
         SimpleEdgeHandle eh = new SimpleEdgeHandle(1, 2);
-        long left = 1L;
-        long right = 2L;
         SimpleEdgeList instance = new SimpleEdgeList();
-        instance.add(left, right);
+        instance.add(eh);
         instance.trimAndSort();
         try ( Stream<SimpleEdgeHandle> stream = instance.stream()) {
             var iterator = stream.iterator();
@@ -60,14 +58,14 @@ public class SimpleEdgeListTest {
      * Test of trimAndSort method, of class SimpleEdgeList.
      */
     @Test
-    public void testTrimAndSort() throws Exception {
+    public void testTrimAndSort() {
         long[] expected = new long[]{1, -1, 2, -2, 3, -3};
         testTrimAndSortByArray(new long[]{1, -1, 2, -2, 3, -4, 2, -3}, new long[]{1, -1, 2, -3, 2, -2, 3, -4});
         testTrimAndSortByArray(new long[]{1, -1, 2, -2, 3, -3}, expected);
         testTrimAndSortByArray(new long[]{1, -1, 3, -3, 2, -2}, expected);
     }
 
-    private void testTrimAndSortByArray(long[] field, long[] expected) throws Exception {
+    private void testTrimAndSortByArray(long[] field, long[] expected) {
         SimpleEdgeList instance = edgeListFromLongArray(field);
         instance.trimAndSort();
         try ( Stream<SimpleEdgeHandle> stream = instance.stream()) {
@@ -85,7 +83,7 @@ public class SimpleEdgeListTest {
     private SimpleEdgeList edgeListFromLongArray(long[] field) {
         SimpleEdgeList instance = new SimpleEdgeList();
         for (int i = 0; i < field.length;) {
-            instance.add(field[i++], field[i++]);
+            instance.add(new SimpleEdgeHandle(field[i++], field[i++]));
         }
         return instance;
     }
@@ -122,7 +120,7 @@ public class SimpleEdgeListTest {
     public void testBigValueIterator() {
         SimpleEdgeList instance = new SimpleEdgeList();
 
-        int length = SimpleEdgeList.CHUNK_SIZE * 3;
+        int length = LongLongSpinalList.CHUNK_SIZE * 3;
         testIterator(length, instance);
     }
 
@@ -130,11 +128,14 @@ public class SimpleEdgeListTest {
      * Test of iterator method, of class SimpleEdgeList.
      */
     @Test
-    public void testIteratorGoingLeftWithEarlyTermination() throws Exception {
+    public void testIteratorGoingLeftWithEarlyTermination()  {
         SimpleEdgeList instance = new SimpleEdgeList();
         int length = 10;
-        testIterator(length, instance);
-
+        for (int i = 0; i < length;) {
+            SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, ++i);
+            instance.add(eh);
+        }
+        instance.trimAndSort();
         try ( var stream = instance.streamToLeft(new SimpleNodeHandle(1))) {
             var iterator = stream.iterator();
             assertTrue(iterator.hasNext());
@@ -153,7 +154,7 @@ public class SimpleEdgeListTest {
     }
 
     @Test
-    public void testIteratorGoingRightWithEarlyTermination() throws Exception {
+    public void testIteratorGoingRightWithEarlyTermination() {
         SimpleEdgeList instance = new SimpleEdgeList();
         int length = 10;
         for (int i = 0; i < length;) {
