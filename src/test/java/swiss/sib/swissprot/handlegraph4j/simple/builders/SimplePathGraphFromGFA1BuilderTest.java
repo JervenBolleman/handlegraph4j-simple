@@ -68,7 +68,7 @@ public class SimplePathGraphFromGFA1BuilderTest {
      * Test of parse method, of class SimplePathGraphFromGFA1Builder.
      */
     @Test
-    public void testParse() throws Exception {
+    public void testParse() {
         GFA1Reader gFA1Reader = new GFA1Reader(Arrays.asList(TEST_DATA.split("\n")).iterator());
         SimplePathGraphFromGFA1Builder instance = new SimplePathGraphFromGFA1Builder();
         instance.parse(gFA1Reader);

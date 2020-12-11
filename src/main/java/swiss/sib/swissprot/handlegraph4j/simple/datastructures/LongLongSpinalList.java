@@ -5,7 +5,13 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
-import io.github.vgteam.handlegraph4j.sequences.AutoClosedIterator;
+import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.from;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.filter;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.flatMap;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
+import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
 import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.Spliterator.NONNULL;
 
@@ -16,6 +22,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.PrimitiveIterator.OfLong;
+import java.util.PrimitiveIterator.OfInt;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BiFunction;
@@ -62,7 +69,8 @@ public class LongLongSpinalList<T> {
         Iterator<Iterator<T>> iterator = chunks.stream()
                 .map(Chunk::iterator)
                 .iterator();
-        return new AutoClosedIterator.CollectingOfIterator<>(iterator);
+        var toFlatMap = map(iterator, AutoClosedIterator::from);
+        return flatMap(toFlatMap);
     }
 
     public void trimAndSort() {
@@ -97,6 +105,40 @@ public class LongLongSpinalList<T> {
                 );
     }
 
+    public AutoClosedIterator<T> iterateToLeft(long key) {
+        if (chunks.isEmpty())
+            return empty();
+        int firstIndex = 0;
+        int lastIndex = 1;
+        if (chunks.size() > 1) {
+            firstIndex = findFirstChunkThatMightMatch(key);
+            lastIndex = lastFirstChunkThatMightMatch(firstIndex, key);
+        }
+        List<Chunk<T>> potential = chunks.subList(firstIndex, lastIndex);
+        if (potential.isEmpty()) {
+            return empty();
+        }
+        var from = from(potential.
+                iterator()
+        );
+        var ensureKeyGreaterThanFirst = filter(from, c -> {
+            long fetchedKey = c.firstKey();
+            return key >= fetchedKey;
+        });
+        var ensureKeySmallerThanLast = filter(ensureKeyGreaterThanFirst, c -> {
+            long fetchedKey = c.lastKey();
+            return key >= fetchedKey;
+        });
+        var inChunkIters = map(ensureKeySmallerThanLast, Chunk::iterator);
+        var closeables = map(inChunkIters, AutoClosedIterator::from);
+        var fromKey = flatMap(closeables);
+        var matchingKey = filter(fromKey, e -> {
+            long fetchedKey = getKey.apply(e);
+            return fetchedKey == key;
+        });
+        return matchingKey;
+    }
+
     private int findFirstChunkThatMightMatch(long key) {
         int index = Collections.binarySearch(chunks,
                 new SearchChunk<>(key),
@@ -119,6 +161,16 @@ public class LongLongSpinalList<T> {
             while (index > 0 && chunks.get(index).firstKey() > key) {
                 index--;
             }
+        }
+        return index;
+    }
+
+    private int lastFirstChunkThatMightMatch(int index, long key) {
+        index++;
+        //Check if there are more chunks that might have the data
+        while (index < chunks.size() - 1
+                && chunks.get(index + 1).lastKey() <= key) {
+            index++;
         }
         return index;
     }
@@ -184,10 +236,16 @@ public class LongLongSpinalList<T> {
         Iterator<OfLong> iter = chunks
                 .stream()
                 .map(Chunk::keyIterator)
-                .collect(Collectors.toList())
                 .iterator();
-
-        return new AutoClosedIterator.CollectingOfLong(iter);
+        return new CollectingOfLong(iter);
+    }
+    
+    public OfLong valueIterator() {
+        Iterator<OfLong> iter = chunks
+                .stream()
+                .map(Chunk::valueIterator)
+                .iterator();
+        return new CollectingOfLong(iter);
     }
 
     public long size() {
@@ -211,12 +269,16 @@ public class LongLongSpinalList<T> {
         public LongStream streamKeys();
 
         public OfLong keyIterator();
+        
+        public OfLong valueIterator();
 
         T first();
 
         T last();
 
         long firstKey();
+
+        long lastKey();
     }
 
     private static class CompressedChunck<T> implements Chunk<T> {
@@ -355,6 +417,37 @@ public class LongLongSpinalList<T> {
                 }
             };
         }
+        
+         @Override
+        public OfLong valueIterator() {
+            int[] intValues = new IntCompressor().uncompress(compressedKeys);
+            return new OfLong() {
+                int cursor = 0;
+
+                int currentInt() {
+                    if (cursor == 0) {
+                        return firstValue;
+                    } else if (cursor == intValues.length) {
+                        return lastValue;
+                    } else {
+                        int intkey = intValues[cursor - 1];
+                        return intkey;
+                    }
+                }
+
+                @Override
+                public long nextLong() {
+                    long rotateLeft = rotateLeft(currentInt());
+                    cursor++;
+                    return rotateLeft;
+                }
+
+                @Override
+                public boolean hasNext() {
+                    return cursor < intValues.length + 2;
+                }
+            };
+        }
 
         @Override
         public T first() {
@@ -382,6 +475,11 @@ public class LongLongSpinalList<T> {
         @Override
         public long firstKey() {
             return rotateLeft(firstKey);
+        }
+
+        @Override
+        public long lastKey() {
+            return rotateLeft(lastKey);
         }
 
         private static class Decompressing<T> implements Iterator<T> {
@@ -500,8 +598,54 @@ public class LongLongSpinalList<T> {
         }
 
         @Override
+        public OfLong valueIterator() {
+            return new OfLong() {
+                int cursor = 0;
+
+                @Override
+                public long nextLong() {
+                    return values[cursor++];
+                }
+
+                @Override
+                public boolean hasNext() {
+                    return cursor < values.length;
+                }
+            };
+        }
+        
+        @Override
         public T first() {
             return reconstructor.apply(keys[0], values[0]);
+        }
+
+        OfInt indexesOfKey(long key) {
+            return new OfInt() {
+                int start = skipToKey(key);
+
+                @Override
+                public int nextInt() {
+                    return start++;
+                }
+
+                @Override
+                public boolean hasNext() {
+                    if (start < keys.length - 1) {
+                        if (keys[start + 1] == key) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            };
+        }
+
+        private int skipToKey(long key) {
+            int index = Arrays.binarySearch(keys, key);
+            while (index > 0 && keys[index - 1] == key) {
+                index--;
+            }
+            return index;
         }
 
         @Override
@@ -512,6 +656,11 @@ public class LongLongSpinalList<T> {
         @Override
         public T last() {
             return reconstructor.apply(keys[size - 1], values[size - 1]);
+        }
+
+        @Override
+        public long lastKey() {
+            return keys[size - 1];
         }
 
         @Override
@@ -602,6 +751,12 @@ public class LongLongSpinalList<T> {
         }
 
         @Override
+        public OfLong valueIterator() {
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
+        }
+        
+        
+        @Override
         public Iterator<T> iterator() {
             throw new UnsupportedOperationException(NOT_SUPPORTED);
         }
@@ -611,7 +766,11 @@ public class LongLongSpinalList<T> {
             return key;
         }
 
+        @Override
+        public long lastKey() {
+            throw new UnsupportedOperationException(NOT_SUPPORTED);
+        }
+
     }
 
-    
 }

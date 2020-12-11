@@ -5,7 +5,12 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
-import io.github.vgteam.handlegraph4j.sequences.AutoClosedIterator;
+import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.filter;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.from;
+import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
 import io.github.vgteam.handlegraph4j.sequences.LongSequence;
 import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.Spliterator.NONNULL;
@@ -25,11 +30,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PrimitiveIterator.OfLong;
+import java.util.function.Predicate;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.eclipse.collections.api.LazyLongIterable;
+import org.eclipse.collections.api.RichIterable;
 import org.eclipse.collections.api.iterator.LongIterator;
+import org.eclipse.collections.api.tuple.primitive.LongIntPair;
 import org.eclipse.collections.impl.list.mutable.primitive.LongArrayList;
 import org.eclipse.collections.impl.map.mutable.primitive.LongIntHashMap;
 import org.roaringbitmap.longlong.Roaring64Bitmap;
@@ -134,6 +142,43 @@ public class NodeToSequenceMap {
         };
     }
 
+    public AutoClosedIterator<SimpleNodeHandle> nodesWithSequence(Sequence s) {
+        if (s == null) {
+            return empty();
+        }
+        if (fewNps.containsKey(s)) {
+            OfLong asLong = iteratorFromBitMap(fewNps.get(s));
+            return map(asLong, SimpleNodeHandle::new);
+        }
+        if (s.getType() == SequenceType.LONG_VIA_ID) {
+            var keyValuesView = nodeToLongSequencePositionMap.keyValuesView();
+            AutoClosedIterator<LongIntPair> from = from(keyValuesView.iterator());
+            var idSeqOfset = map(from, p -> {
+                int so = p.getTwo();
+                long id = p.getOne();
+
+                return new Object[]{id, getLongSequence(so)};
+            });
+            var filter = filter(idSeqOfset, a -> s.equals(a[1]));
+            return map(filter, a -> new SimpleNodeHandle((long) a[0]));
+        } else {
+            long sl = sequenceAsLong(s);
+            var from = from(nodeToShortSequenceMap.iterator());
+            Predicate<NodeSequence> filter = (ns) -> ns.sequence() == sl;
+            return map(filter(from, filter), ns -> new SimpleNodeHandle(ns.nodeId));
+        }
+    }
+
+    private long sequenceAsLong(Sequence s) {
+        long sl = 0;
+        if (s instanceof ShortKnownSequence) {
+            sl = ((ShortKnownSequence) s).asLong();
+        } else if (s instanceof ShortAmbiguousSequence) {
+            sl = ((ShortAmbiguousSequence) s).asLong();
+        }
+        return sl;
+    }
+
     public Sequence getSequence(SimpleNodeHandle handle) {
         for (Entry<Sequence, Roaring64Bitmap> en : fewNps.entrySet()) {
             if (en.getValue().contains(handle.id())) {
@@ -143,18 +188,11 @@ public class NodeToSequenceMap {
 
         if (nodeToLongSequencePositionMap.containsKey(handle.id())) {
             int offset = nodeToLongSequencePositionMap.get(handle.id());
-            long sizeAndLongs = longSequenceLinearLayout.get(offset);
-            int size = (int) (sizeAndLongs >>> 32);
-            int longs = (int) sizeAndLongs;
-            long[] seq = new long[longs];
-            for (int i = 0; i < longs; i++) {
-                seq[i] = longSequenceLinearLayout.get(offset + i);
-            }
-            return new LongSequence(seq, (int) size);
+            return getLongSequence(offset);
         }
-        var s = nodeToShortSequenceMap.streamToLeft(handle.id()).findAny();
-        if (s.isPresent()) {
-            long sequence = s.get().sequence;
+        var s = nodeToShortSequenceMap.iterateToLeft(handle.id());
+        if (s.hasNext()) {
+            long sequence = s.next().sequence;
             SequenceType fromLong = SequenceType.fromLong(sequence);
             switch (fromLong) {
                 case SHORT_KNOWN:
@@ -164,6 +202,17 @@ public class NodeToSequenceMap {
             }
         }
         throw new IllegalStateException("A simple node handle was passed in which does not have a sequence");
+    }
+
+    private Sequence getLongSequence(int offset) {
+        long sizeAndLongs = longSequenceLinearLayout.get(offset);
+        int size = (int) (sizeAndLongs >>> 32);
+        int longs = (int) sizeAndLongs;
+        long[] seq = new long[longs];
+        for (int i = 0; i < longs; i++) {
+            seq[i] = longSequenceLinearLayout.get(offset + i);
+        }
+        return new LongSequence(seq, (int) size);
     }
 
     public void add(long id, Sequence sequence) {
@@ -233,7 +282,9 @@ public class NodeToSequenceMap {
 
     public OfLong nodeIdsIterator() {
         var nssm = nodeToShortSequenceMap.keyIterator();
-        LongIterator nlsmli = nodeToLongSequencePositionMap.keysView().longIterator();
+        LongIterator nlsmli = nodeToLongSequencePositionMap
+                .keysView()
+                .longIterator();
         var nlsm = fromLongIterator(nlsmli);
         List<OfLong> li = new ArrayList<>();
 
@@ -242,7 +293,7 @@ public class NodeToSequenceMap {
         }
         li.add(nssm);
         li.add(nlsm);
-        return new AutoClosedIterator.CollectingOfLong(li.iterator());
+        return new CollectingOfLong(li.iterator());
     }
 
     private OfLong fromLongIterator(LongIterator li) {

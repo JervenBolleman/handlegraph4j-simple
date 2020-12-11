@@ -5,6 +5,7 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
+import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Spliterator;
@@ -49,6 +50,10 @@ public class SimpleEdgeList {
     
     public Stream<SimpleEdgeHandle> streamToLeft(SimpleNodeHandle left) {
         return kv.streamToLeft(left.id());
+    }
+    
+    public AutoClosedIterator<SimpleEdgeHandle> iterateToLeft(SimpleNodeHandle left) {
+        return kv.iterateToLeft(left.id());
     }
     
     public Stream<SimpleEdgeHandle> streamToRight(SimpleNodeHandle right) {
