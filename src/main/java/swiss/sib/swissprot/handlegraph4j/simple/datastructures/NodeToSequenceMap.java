@@ -12,7 +12,7 @@ import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.filter;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.from;
-import static swiss.sib.swissprot.handlegraph4j.simple.datastructures.LongLongSpinalList.ToLong;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.of;
 import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
 import io.github.vgteam.handlegraph4j.sequences.LongSequence;
 import static java.util.Spliterators.spliteratorUnknownSize;
@@ -33,19 +33,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PrimitiveIterator.OfLong;
-import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.function.Predicate;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.eclipse.collections.api.LazyLongIterable;
 import org.eclipse.collections.api.iterator.LongIterator;
 import org.eclipse.collections.api.tuple.primitive.LongIntPair;
 import org.eclipse.collections.impl.list.mutable.primitive.LongArrayList;
 import org.eclipse.collections.impl.map.mutable.primitive.LongIntHashMap;
 import org.roaringbitmap.longlong.Roaring64Bitmap;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
+import swiss.sib.swissprot.handlegraph4j.simple.datastructures.LongLongSpinalList.ToLong;
 
 /**
  *
@@ -55,35 +55,37 @@ public class NodeToSequenceMap {
 
     private final Map<Sequence, Roaring64Bitmap> fewNps = new HashMap<>();
     private final LongLongSpinalList<NodeSequence<SimpleNodeHandle>> nodeToShortSequenceMap;
-    private final LongIntHashMap nodeToLongSequencePositionMap;
+    private final LongIntHashMap nodeToLongSequenceOffsetMap;
     private final LongArrayList longSequenceLinearLayout;
     private long maxNodeId;
     private static final int FEW_NUCLEOTIDES_LIMIT = 3;
 
-    private static class NodeSequenceComparator implements
-            Comparator<NodeSequence<SimpleNodeHandle>> {
-
-        @Override
-        public int compare(NodeSequence o1, NodeSequence o2) {
-            return Long.compare(o1.node().id(), o2.node().id());
-        }
+    private static int compareNodeSequence(NodeSequence o1, NodeSequence o2) {
+        return Long.compare(o1.node().id(), o2.node().id());
     }
 
-    private static final ToLong<NodeSequence<SimpleNodeHandle>> GET_KEY
-            = ns -> ns.node().id();
-    private static final ToLong<NodeSequence<SimpleNodeHandle>> GET_VALUE
-            = ns -> sequenceAsLong(ns.sequence());
+    private static long getNodeId(NodeSequence<SimpleNodeHandle> ns) {
+        return ns.node().id();
+    }
+
+    private static long getSequenceAsLong(NodeSequence<SimpleNodeHandle> ns) {
+        return sequenceAsLong(ns.sequence());
+    }
+
+    private static NodeSequence<SimpleNodeHandle> reconstruct(long key, long value) {
+        var node = new SimpleNodeHandle(key);
+        return new NodeSequence<>(node, sequenceFromEncodedLong(value));
+    }
 
     public NodeToSequenceMap() {
-        this.nodeToShortSequenceMap = new LongLongSpinalList<>((key, value) -> {
-            var node = new SimpleNodeHandle(key);
-            return new NodeSequence<>(node, sequenceFromEncodedLong(value));
-        },
-                GET_KEY,
-                GET_VALUE,
-                new NodeSequenceComparator()
-        );
-        this.nodeToLongSequencePositionMap = new LongIntHashMap();
+        ToLong<NodeSequence<SimpleNodeHandle>> gn = NodeToSequenceMap::getNodeId;
+        ToLong<NodeSequence<SimpleNodeHandle>> gs = NodeToSequenceMap::getSequenceAsLong;
+        this.nodeToShortSequenceMap = new LongLongSpinalList<>(
+                NodeToSequenceMap::reconstruct,
+                gn,
+                gs,
+                NodeToSequenceMap::compareNodeSequence);
+        this.nodeToLongSequenceOffsetMap = new LongIntHashMap();
         this.longSequenceLinearLayout = new LongArrayList();
         initializeVeryShortSequenceMaps();
         for (int i = 4; i < ShortAmbiguousSequence.MAX_LENGTH; i++) {
@@ -96,13 +98,13 @@ public class NodeToSequenceMap {
     private void initializeVeryShortSequenceMaps() {
         for (Character ch1 : Sequence.KNOWN_IUPAC_CODES) {
             byte b1 = (byte) ch1.charValue();
-            fewNps.put(new SingleNucleotideSequence(b1), new Roaring64Bitmap());
+            SingleNucleotideSequence seq = new SingleNucleotideSequence(b1);
+            fewNps.put(seq, new Roaring64Bitmap());
             for (Character ch2 : Sequence.KNOWN_IUPAC_CODES) {
-                Roaring64Bitmap rbm = new Roaring64Bitmap();
                 byte b2 = (byte) ch2.charValue();
                 byte[] ba = new byte[]{b1, b2};
-                Sequence seq = SequenceType.fromByteArray(ba);
-                fewNps.put(seq, rbm);
+                Sequence seq2 = SequenceType.fromByteArray(ba);
+                fewNps.put(seq2, new Roaring64Bitmap());
                 for (Character ch3 : Sequence.KNOWN_IUPAC_CODES) {
                     byte b3 = (byte) ch3.charValue();
                     byte[] ba3 = new byte[]{b1, b2, b3};
@@ -115,7 +117,7 @@ public class NodeToSequenceMap {
 
     public Stream<SimpleNodeHandle> nodes() {
         return nodesIds()
-                .mapToObj(id -> new SimpleNodeHandle(id));
+                .mapToObj(SimpleNodeHandle::new);
     }
 
     public Iterator<SimpleNodeHandle> nodeIterator() {
@@ -138,14 +140,13 @@ public class NodeToSequenceMap {
         var smalls = nodesWithSmallSequences();
 
         var longs = nodesWithLongSequences();
-        var iters = nodesWithMediumKnownSequences(smalls, longs);
+        var mediums = nodesWithMediumKnownSequences();
+        var iters = of(smalls, mediums, longs);
         return AutoClosedIterator.flatMap(iters);
     }
 
-    private AutoClosedIterator<AutoClosedIterator<NodeSequence<SimpleNodeHandle>>> nodesWithMediumKnownSequences(AutoClosedIterator<NodeSequence<SimpleNodeHandle>> smalls, AutoClosedIterator<NodeSequence<SimpleNodeHandle>> longs) {
-        var mediums = from(nodeToShortSequenceMap.iterator());
-        var iters = AutoClosedIterator.of(smalls, mediums, longs);
-        return iters;
+    private AutoClosedIterator<NodeSequence<SimpleNodeHandle>> nodesWithMediumKnownSequences() {
+        return from(nodeToShortSequenceMap.iterator());
     }
 
     private class LongIntToSequence implements Function<LongIntPair, NodeSequence<SimpleNodeHandle>> {
@@ -158,16 +159,17 @@ public class NodeToSequenceMap {
         }
     }
 
-    private class LongToSequence implements Function<Long, NodeSequence<SimpleNodeHandle>> {
+    private static class AttachNodeToSequence
+            implements LongFunction<NodeSequence<SimpleNodeHandle>> {
 
         private final Sequence seq;
 
-        public LongToSequence(Sequence seq) {
+        public AttachNodeToSequence(Sequence seq) {
             this.seq = seq;
         }
 
         @Override
-        public NodeSequence<SimpleNodeHandle> apply(Long id) {
+        public NodeSequence<SimpleNodeHandle> apply(long id) {
             var node = new SimpleNodeHandle(id);
             return new NodeSequence<>(node, seq);
         }
@@ -180,14 +182,14 @@ public class NodeToSequenceMap {
         public AutoClosedIterator<NodeSequence<SimpleNodeHandle>> apply(Entry<Sequence, Roaring64Bitmap> en) {
             Sequence s = en.getKey();
             Roaring64Bitmap b = en.getValue();
-            return map(iteratorFromBitMap(b), new LongToSequence(s));
+            return map(iteratorFromBitMap(b), new AttachNodeToSequence(s));
         }
 
     }
 
     private AutoClosedIterator<NodeSequence<SimpleNodeHandle>> nodesWithLongSequences() {
-        var longToOffsetView = from(nodeToLongSequencePositionMap.keyValuesView()
-                .iterator());
+        var nodeOffset = nodeToLongSequenceOffsetMap.keyValuesView().iterator();
+        var longToOffsetView = from(nodeOffset);
 
         var longs = map(longToOffsetView, new LongIntToSequence());
         return longs;
@@ -204,25 +206,18 @@ public class NodeToSequenceMap {
         }
         if (fewNps.containsKey(s)) {
             OfLong asLong = iteratorFromBitMap(fewNps.get(s));
-            return map(asLong, SimpleNodeHandle::new);
+            LongFunction<SimpleNodeHandle> name = SimpleNodeHandle::new;
+            return map(asLong, name);
         }
         if (s.getType() == SequenceType.LONG_VIA_ID) {
-            var keyValuesView = nodeToLongSequencePositionMap.keyValuesView();
-            AutoClosedIterator<LongIntPair> from = from(keyValuesView.iterator());
-            var idSeqOfset = map(from, p -> {
-                int so = p.getTwo();
-                long id = p.getOne();
-
-                return new Object[]{id, getLongSequence(so)};
-            });
-            var filter = filter(idSeqOfset, a -> s.equals(a[1]));
-            return map(filter, a -> new SimpleNodeHandle((long) a[0]));
+            var nAndSeq = nodesWithLongSequences();
+            var filter = filter(nAndSeq, ns -> s.equals(ns.sequence()));
+            return map(filter, NodeSequence::node);
         } else {
             long sl = sequenceAsLong(s);
             var from = from(nodeToShortSequenceMap.iterator());
             Predicate<NodeSequence<SimpleNodeHandle>> filter = (ns) -> sequenceAsLong(ns.sequence()) == sl;
-            Function<NodeSequence<SimpleNodeHandle>, SimpleNodeHandle> mapper = ns -> ns.node();
-            return map(filter(from, filter), mapper);
+            return map(filter(from, filter), NodeSequence::node);
         }
     }
 
@@ -243,8 +238,8 @@ public class NodeToSequenceMap {
             }
         }
 
-        if (nodeToLongSequencePositionMap.containsKey(handle.id())) {
-            int offset = nodeToLongSequencePositionMap.get(handle.id());
+        if (nodeToLongSequenceOffsetMap.containsKey(handle.id())) {
+            int offset = nodeToLongSequenceOffsetMap.get(handle.id());
             return getLongSequence(offset);
         }
         var s = nodeToShortSequenceMap.iterateToLeft(handle.id());
@@ -266,7 +261,7 @@ public class NodeToSequenceMap {
         }
     }
 
-    private Sequence getLongSequence(int offset) {
+    private LongSequence getLongSequence(int offset) {
         long sizeAndLongs = longSequenceLinearLayout.get(offset);
         int size = (int) (sizeAndLongs >>> 32);
         int longs = (int) sizeAndLongs;
@@ -299,13 +294,13 @@ public class NodeToSequenceMap {
             for (int i = 0; i < longs; i++) {
                 longSequenceLinearLayout.add(s[i]);
             }
-            nodeToLongSequencePositionMap.put(id, at);
+            nodeToLongSequenceOffsetMap.put(id, at);
         }
     }
 
     public void trim() {
         trimFewNps();
-        nodeToLongSequencePositionMap.compact();
+        nodeToLongSequenceOffsetMap.compact();
         nodeToShortSequenceMap.trimAndSort();
         longSequenceLinearLayout.trimToSize();
     }
@@ -329,7 +324,7 @@ public class NodeToSequenceMap {
 
     public boolean areAllSequencesOneBaseLong() {
 
-        if (nodeToShortSequenceMap.isEmpty() && nodeToLongSequencePositionMap.isEmpty()) {
+        if (nodeToShortSequenceMap.isEmpty() && nodeToLongSequenceOffsetMap.isEmpty()) {
             return 1 == fewNps.keySet().stream()
                     .mapToInt(Sequence::length)
                     .max()
@@ -344,7 +339,7 @@ public class NodeToSequenceMap {
 
     public OfLong nodeIdsIterator() {
         var nssm = nodeToShortSequenceMap.keyIterator();
-        LongIterator nlsmli = nodeToLongSequencePositionMap
+        LongIterator nlsmli = nodeToLongSequenceOffsetMap
                 .keysView()
                 .longIterator();
         var nlsm = fromLongIterator(nlsmli);
@@ -372,15 +367,6 @@ public class NodeToSequenceMap {
         };
     }
 
-    private LongStream nodeIdsFromBitMap(Roaring64Bitmap nodeIds) throws UnsupportedOperationException {
-        if (nodeIds == null) {
-            return LongStream.empty();
-        } else {
-            var iterator = iteratorFromBitMap(nodeIds);
-            return streamFromOfLong(iterator);
-        }
-    }
-
     private OfLong iteratorFromBitMap(Roaring64Bitmap nodeIds) {
         var longIterator = nodeIds.getLongIterator();
         return new OfLong() {
@@ -402,38 +388,11 @@ public class NodeToSequenceMap {
         return StreamSupport.longStream(si, false);
     }
 
-    private LongStream nodeIdsFromNodeToSequenceMap() {
-        return nodeToShortSequenceMap.keyStream();
-    }
-
-    private LongStream nodeIdsFromSequenceMap() {
-        LazyLongIterable keysView = nodeToLongSequencePositionMap.keysView();
-        var longIterator = keysView.longIterator();
-        return longIteratorToStream(longIterator, keysView.size());
-    }
-
-    private LongStream longIteratorToStream(LongIterator longIterator, long size) {
-        var primitiveIter = new OfLong() {
-
-            @Override
-            public long nextLong() {
-                return longIterator.next();
-            }
-
-            @Override
-            public boolean hasNext() {
-                return longIterator.hasNext();
-            }
-        };
-        var si = spliteratorUnknownSize(primitiveIter, NONNULL);
-        return StreamSupport.longStream(si, false);
-    }
-
     public long count() {
         long sumSNps = fewNps.values()
                 .stream()
                 .mapToLong(Roaring64Bitmap::getLongCardinality)
                 .sum();
-        return sumSNps + nodeToShortSequenceMap.size() + nodeToLongSequencePositionMap.size();
+        return sumSNps + nodeToShortSequenceMap.size() + nodeToLongSequenceOffsetMap.size();
     }
 }

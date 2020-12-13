@@ -68,15 +68,15 @@ public class SimpleEdgeListTest {
     private void testTrimAndSortByArray(long[] field, long[] expected) {
         SimpleEdgeList instance = edgeListFromLongArray(field);
         instance.trimAndSort();
-        try ( Stream<SimpleEdgeHandle> stream = instance.stream()) {
-            var iterator = stream.iterator();
-            for (int i = 0; i < field.length;) {
-                assertTrue(iterator.hasNext());
-                SimpleEdgeHandle eh = new SimpleEdgeHandle(expected[i++], expected[i++]);
-                assertEquals(eh, iterator.next());
-            }
-            assertFalse(iterator.hasNext());
+        var iterator = instance.iterator();
+        for (int i = 0; i < field.length;) {
+            assertTrue(iterator.hasNext());
+            SimpleEdgeHandle eh = new SimpleEdgeHandle(expected[i++], expected[i++]);
+            SimpleEdgeHandle next = iterator.next();
+            assertEquals(eh, next);
         }
+        assertFalse(iterator.hasNext());
+
 //        assertFalse(instance.isNotSorted());
     }
 
@@ -152,14 +152,19 @@ public class SimpleEdgeListTest {
         SimpleEdgeList instance = new SimpleEdgeList();
         int length = LongLongSpinalList.CHUNK_SIZE * 3;
         for (int i = 0; i < length;) {
-            SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, ++i);
+            SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, i);
             instance.add(eh);
         }
+//        assertEquals(96, instance.size());
         instance.trimAndSort();
-        for (int i = 1; i < length; i += 2) {
+        assertEquals(96, instance.size());
+        try ( var iterator = instance.iterateToLeft(new SimpleNodeHandle(3))) {
+            assertTrue(iterator.hasNext(), " at " + 3);
+        }
+        for (int i = 1; i < length; i += 1) {
             try ( var iterator = instance.iterateToLeft(new SimpleNodeHandle(i))) {
                 assertTrue(iterator.hasNext(), " at " + i);
-                SimpleEdgeHandle eh = new SimpleEdgeHandle(i, i + 1);
+                SimpleEdgeHandle eh = new SimpleEdgeHandle(i, i);
                 assertEquals(eh, iterator.next(), " at " + i);
                 assertFalse(iterator.hasNext(), " at " + i);
             }

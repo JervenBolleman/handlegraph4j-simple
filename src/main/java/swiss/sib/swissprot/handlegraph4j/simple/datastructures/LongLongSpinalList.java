@@ -11,6 +11,8 @@ import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.filter
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.flatMap;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.of;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.terminate;
 import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
 import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.Spliterator.NONNULL;
@@ -25,8 +27,6 @@ import java.util.PrimitiveIterator.OfLong;
 import java.util.PrimitiveIterator.OfInt;
 import java.util.Spliterator;
 import java.util.Spliterators;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -38,32 +38,33 @@ import me.lemire.integercompression.differential.IntegratedIntCompressor;
 /**
  *
  * @author Jerven Bolleman <jerven.bolleman@sib.swiss>
- * @param <T> the type of object representated by this key value store
+ * @param <T> the type of object represented by this key value store
  */
 public class LongLongSpinalList<T> {
 
     protected static final int CHUNK_SIZE = 32 * 1024;
-    private final Reconstructor reconstructor;
-    private final ToLong getKey;
-    private final ToLong getValue;
+    private final Reconstructor<T> reconstructor;
+    private final ToLong<T> getKey;
+    private final ToLong<T> getValue;
     private final Comparator<T> comparator;
     private final ArrayList<Chunk<T>> chunks = new ArrayList<>();
     private BasicChunk<T> current;
 
     @FunctionalInterface
     public interface Reconstructor<T> {
+
         public T apply(long key, long value);
     }
-    
+
     @FunctionalInterface
     public interface ToLong<T> {
-        
+
         public long apply(T t);
     }
-    
-    public LongLongSpinalList(Reconstructor reconstructor,
-            ToLong getKey,
-            ToLong getValue,
+
+    public LongLongSpinalList(Reconstructor<T> reconstructor,
+            ToLong<T> getKey,
+            ToLong<T> getValue,
             Comparator<T> comparator) {
         this.reconstructor = reconstructor;
         this.getKey = getKey;
@@ -87,6 +88,7 @@ public class LongLongSpinalList<T> {
 
     public void trimAndSort() {
         if (current != null) {
+            current.sort();
             chunks.add(current);
             current = null;
         }
@@ -118,8 +120,9 @@ public class LongLongSpinalList<T> {
     }
 
     public AutoClosedIterator<T> iterateToLeft(long key) {
-        if (chunks.isEmpty())
+        if (chunks.isEmpty()) {
             return empty();
+        }
         int firstIndex = 0;
         int lastIndex = 1;
         if (chunks.size() > 1) {
@@ -130,25 +133,10 @@ public class LongLongSpinalList<T> {
         if (potential.isEmpty()) {
             return empty();
         }
-        var from = from(potential.
-                iterator()
-        );
-        var ensureKeyGreaterThanFirst = filter(from, c -> {
-            long fetchedKey = c.firstKey();
-            return key >= fetchedKey;
-        });
-        var ensureKeySmallerThanLast = filter(ensureKeyGreaterThanFirst, c -> {
-            long fetchedKey = c.lastKey();
-            return key <= fetchedKey;
-        });
-        var inChunkIters = map(ensureKeySmallerThanLast, Chunk::iterator);
-        var closeables = map(inChunkIters, AutoClosedIterator::from);
-        var fromKey = flatMap(closeables);
-        var matchingKey = filter(fromKey, e -> {
-            long fetchedKey = getKey.apply(e);
-            return fetchedKey == key;
-        });
-        return matchingKey;
+        var from = from(potential.iterator());
+
+        var chunksHavingKey = filter(from, c -> c.hasKey(key));
+        return flatMap(map(chunksHavingKey, c -> c.<T>fromKey(key, getKey)));
     }
 
     private int findFirstChunkThatMightMatch(long key) {
@@ -251,7 +239,7 @@ public class LongLongSpinalList<T> {
                 .iterator();
         return new CollectingOfLong(iter);
     }
-    
+
     public OfLong valueIterator() {
         Iterator<OfLong> iter = chunks
                 .stream()
@@ -281,7 +269,7 @@ public class LongLongSpinalList<T> {
         public LongStream streamKeys();
 
         public OfLong keyIterator();
-        
+
         public OfLong valueIterator();
 
         T first();
@@ -291,6 +279,33 @@ public class LongLongSpinalList<T> {
         long firstKey();
 
         long lastKey();
+
+        public default boolean hasKey(long key) {
+            if (key < firstKey()) {
+                return false;
+            }
+            if (key > lastKey()) {
+                return false;
+            }
+            var keys = keyIterator();
+            while (keys.hasNext()) {
+                if (keys.nextLong() == key) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public default AutoClosedIterator<T> fromKey(long key, ToLong<T> getKey) {
+            if (key < firstKey()) {
+                return empty();
+            } else if (key > lastKey()) {
+                return empty();
+            }
+
+            var iterator = from(iterator());
+            return terminate(iterator, next -> getKey.apply(next) == key);
+        }
     }
 
     private static class CompressedChunck<T> implements Chunk<T> {
@@ -303,11 +318,12 @@ public class LongLongSpinalList<T> {
         private final int[] compressedKeys;
         private final int[] compressedValues;
         private static final int MAX = 1 << 30;
+        private final ToLong<T> getKey;
 
         public CompressedChunck(BasicChunk<T> from,
                 Reconstructor<T> reconstructor,
-                ToLong getKey,
-                ToLong getValue) {
+                ToLong<T> getKey,
+                ToLong<T> getValue) {
             IntegratedIntCompressor iic = new IntegratedIntCompressor();
             int[] rawKeys = new int[from.keys.length - 2];
             for (int i = 1; i < from.keys.length - 1; i++) {
@@ -320,6 +336,7 @@ public class LongLongSpinalList<T> {
                 // We rotate right to make sure we have a positive number
                 rawValues[i - 1] = (int) rotateRight(from.values[i]);
             }
+            this.getKey = getKey;
             IntCompressor ic = new IntCompressor();
             compressedValues = ic.compress(rawValues);
             firstKey = (int) rotateRight(getKey.apply(from.first()));
@@ -348,19 +365,11 @@ public class LongLongSpinalList<T> {
         }
 
         private static long rotateRight(long id) {
-            if (id >= 0) {
-                return id << 1;
-            } else {
-                return (id << 1) | 1;
-            }
+            return id << 1;
         }
 
         private static long rotateLeft(long id) {
-            if ((id & 1l) == 1l) {
-                return -(id >>> 1);
-            } else {
-                return id >>> 1;
-            }
+            return id >> 1;
         }
 
         @Override
@@ -384,12 +393,31 @@ public class LongLongSpinalList<T> {
 
         @Override
         public Iterator<T> iterator() {
-            return stream().iterator();
+            return iterator(0);
+        }
+
+        public Iterator<T> iterator(int start) {
+            OfLong keys = keyIterator(start);
+            OfLong values = valueIterator(start);
+            return new Iterator<T>() {
+
+                @Override
+                public boolean hasNext() {
+                    return keys.hasNext();
+                }
+
+                @Override
+                public T next() {
+                    long key = keys.next();
+                    long value = values.next();
+                    return reconstructor.apply(key, value);
+                }
+            };
         }
 
         @Override
         public LongStream streamKeys() {
-            int[] intkeys = new IntegratedIntCompressor().uncompress(compressedKeys);
+            int[] intkeys = decompressKeys();
             IntStream rawkeys = Arrays.stream(intkeys);
             IntStream start = IntStream.of(firstKey);
             IntStream middle = IntStream.concat(start, rawkeys);
@@ -401,14 +429,18 @@ public class LongLongSpinalList<T> {
 
         @Override
         public OfLong keyIterator() {
-            int[] intkeys = new IntegratedIntCompressor().uncompress(compressedKeys);
+            return keyIterator(0);
+        }
+
+        public OfLong keyIterator(int start) {
+            int[] intkeys = decompressKeys();
             return new OfLong() {
-                int cursor = 0;
+                int cursor = start;
 
                 int currentInt() {
                     if (cursor == 0) {
                         return firstKey;
-                    } else if (cursor == intkeys.length) {
+                    } else if (cursor == intkeys.length + 1) {
                         return lastKey;
                     } else {
                         int intkey = intkeys[cursor - 1];
@@ -425,21 +457,25 @@ public class LongLongSpinalList<T> {
 
                 @Override
                 public boolean hasNext() {
-                    return cursor < intkeys.length + 2;
+                    return cursor < (intkeys.length + 2);
                 }
             };
         }
-        
-         @Override
+
+        @Override
         public OfLong valueIterator() {
-            int[] intValues = new IntCompressor().uncompress(compressedKeys);
+            return valueIterator(0);
+        }
+
+        public OfLong valueIterator(int start) {
+            int[] intValues = decompressValues();
             return new OfLong() {
-                int cursor = 0;
+                int cursor = start;
 
                 int currentInt() {
                     if (cursor == 0) {
                         return firstValue;
-                    } else if (cursor == intValues.length) {
+                    } else if (cursor == intValues.length + 1) {
                         return lastValue;
                     } else {
                         int intkey = intValues[cursor - 1];
@@ -456,9 +492,65 @@ public class LongLongSpinalList<T> {
 
                 @Override
                 public boolean hasNext() {
-                    return cursor < intValues.length + 2;
+                    return cursor < (intValues.length + 2);
                 }
             };
+        }
+
+        private int[] decompressValues() {
+            return new IntCompressor().uncompress(compressedValues);
+        }
+
+        @Override
+        public boolean hasKey(long key) {
+            if (key == firstKey()) {
+                return true;
+            } else if (key == lastKey()) {
+                return true;
+            } else if (Math.abs(key) > MAX) {
+                return false;
+            }
+            int keyAsInt = (int) rotateRight(key);
+            int[] intkeys = decompressKeys();
+            int index = skipToKey(keyAsInt, intkeys);
+            return index >= 0;
+        }
+
+        @Override
+        public AutoClosedIterator<T> fromKey(long key, ToLong<T> getKey) {
+            if (key == firstKey()) {
+                Iterator<T> iterator = iterator(0);
+                return terminate(from(iterator), n -> getKey.apply(n) == key);
+            } else if (Math.abs(key) > MAX) {
+                return null;
+            }
+
+            int keyAsInt = (int) rotateRight(key);
+            int[] intkeys = decompressKeys();
+            int index = skipToKey(keyAsInt, intkeys);
+            if (index < 0) {
+                if (key == lastKey()) {
+                    return of(last());
+                }
+                return null;
+            }
+            return terminate(from(iterator(index + 1)), t -> keyEquals(t, key));
+        }
+
+        private boolean keyEquals(T t, long key) {
+            return getKey.apply(t) == key;
+        }
+
+        private int skipToKey(int key, int[] keys) {
+            int index = Arrays.binarySearch(keys, key);
+            while (index > 0 && keys[index - 1] == key) {
+                index--;
+            }
+            return index;
+        }
+
+        private int[] decompressKeys() {
+            return new IntegratedIntCompressor().uncompress(compressedKeys);
         }
 
         @Override
@@ -589,8 +681,12 @@ public class LongLongSpinalList<T> {
 
         @Override
         public Iterator<T> iterator() {
-            return new Iterator<T>(){
-                int cursor = 0;
+            return iterator(0);
+        }
+
+        public Iterator<T> iterator(int start) {
+            return new Iterator<T>() {
+                int cursor = start;
 
                 @Override
                 public boolean hasNext() {
@@ -599,7 +695,7 @@ public class LongLongSpinalList<T> {
 
                 @Override
                 public T next() {
-                    return reconstructor.apply(keys[cursor],values[cursor++]);
+                    return reconstructor.apply(keys[cursor], values[cursor++]);
                 }
             };
         }
@@ -637,7 +733,7 @@ public class LongLongSpinalList<T> {
                 }
             };
         }
-        
+
         @Override
         public T first() {
             return reconstructor.apply(keys[0], values[0]);
@@ -654,8 +750,8 @@ public class LongLongSpinalList<T> {
 
                 @Override
                 public boolean hasNext() {
-                    if (start < keys.length - 1) {
-                        if (keys[start + 1] == key) {
+                    if (start >= 0 && start < keys.length) {
+                        if (keys[start] == key) {
                             return true;
                         }
                     }
@@ -665,11 +761,30 @@ public class LongLongSpinalList<T> {
         }
 
         private int skipToKey(long key) {
-            int index = Arrays.binarySearch(keys, key);
-            while (index > 0 && keys[index - 1] == key) {
+            int index = Arrays.binarySearch(keys, 0, size, key);
+            while (index > 1 && keys[index - 1] == key) {
                 index--;
             }
             return index;
+        }
+
+        @Override
+        public AutoClosedIterator<T> fromKey(long key, ToLong<T> getKey) {
+            OfInt i = indexesOfKey(key);
+            return from(new Iterator<T>() {
+                @Override
+                public boolean hasNext() {
+                    return i.hasNext();
+                }
+
+                @Override
+                public T next() {
+                    int index = i.nextInt();
+                    long key = keys[index];
+                    long value = values[index];
+                    return reconstructor.apply(key, value);
+                }
+            });
         }
 
         @Override
@@ -778,8 +893,7 @@ public class LongLongSpinalList<T> {
         public OfLong valueIterator() {
             throw new UnsupportedOperationException(NOT_SUPPORTED);
         }
-        
-        
+
         @Override
         public Iterator<T> iterator() {
             throw new UnsupportedOperationException(NOT_SUPPORTED);

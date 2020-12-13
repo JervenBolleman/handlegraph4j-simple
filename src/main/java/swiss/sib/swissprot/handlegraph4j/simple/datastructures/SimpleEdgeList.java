@@ -22,6 +22,10 @@ import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 public class SimpleEdgeList {
     
     private final LongLongSpinalList<SimpleEdgeHandle> kv;
+
+    public long size() {
+        return kv.size();
+    }
     
     private class GetLeftId implements ToLong<SimpleEdgeHandle>{
 
