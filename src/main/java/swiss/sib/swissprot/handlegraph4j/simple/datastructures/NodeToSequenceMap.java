@@ -5,11 +5,14 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
+import io.github.vgteam.handlegraph4j.NodeSequence;
 import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.flatMap;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.filter;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.from;
+import static swiss.sib.swissprot.handlegraph4j.simple.datastructures.LongLongSpinalList.ToLong;
 import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
 import io.github.vgteam.handlegraph4j.sequences.LongSequence;
 import static java.util.Spliterators.spliteratorUnknownSize;
@@ -30,12 +33,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PrimitiveIterator.OfLong;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.eclipse.collections.api.LazyLongIterable;
-import org.eclipse.collections.api.RichIterable;
 import org.eclipse.collections.api.iterator.LongIterator;
 import org.eclipse.collections.api.tuple.primitive.LongIntPair;
 import org.eclipse.collections.impl.list.mutable.primitive.LongArrayList;
@@ -50,45 +54,33 @@ import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 public class NodeToSequenceMap {
 
     private final Map<Sequence, Roaring64Bitmap> fewNps = new HashMap<>();
-    private final LongLongSpinalList<NodeSequence> nodeToShortSequenceMap;
+    private final LongLongSpinalList<NodeSequence<SimpleNodeHandle>> nodeToShortSequenceMap;
     private final LongIntHashMap nodeToLongSequencePositionMap;
     private final LongArrayList longSequenceLinearLayout;
     private long maxNodeId;
     private static final int FEW_NUCLEOTIDES_LIMIT = 3;
 
-    private static class NodeSequence {
-
-        private long nodeId;
-        private long sequence;
-
-        public NodeSequence(long nodeId, long sequence) {
-            this.nodeId = nodeId;
-            this.sequence = sequence;
-        }
-
-        public long nodeId() {
-            return nodeId;
-        }
-
-        public long sequence() {
-            return sequence;
-        }
-    }
-
     private static class NodeSequenceComparator implements
-            Comparator<NodeSequence> {
+            Comparator<NodeSequence<SimpleNodeHandle>> {
 
         @Override
         public int compare(NodeSequence o1, NodeSequence o2) {
-            return Long.compare(o1.nodeId(), o2.nodeId());
+            return Long.compare(o1.node().id(), o2.node().id());
         }
-
     }
 
+    private static final ToLong<NodeSequence<SimpleNodeHandle>> GET_KEY
+            = ns -> ns.node().id();
+    private static final ToLong<NodeSequence<SimpleNodeHandle>> GET_VALUE
+            = ns -> sequenceAsLong(ns.sequence());
+
     public NodeToSequenceMap() {
-        this.nodeToShortSequenceMap = new LongLongSpinalList<>(NodeSequence::new,
-                NodeSequence::nodeId,
-                NodeSequence::sequence,
+        this.nodeToShortSequenceMap = new LongLongSpinalList<>((key, value) -> {
+            var node = new SimpleNodeHandle(key);
+            return new NodeSequence<>(node, sequenceFromEncodedLong(value));
+        },
+                GET_KEY,
+                GET_VALUE,
                 new NodeSequenceComparator()
         );
         this.nodeToLongSequencePositionMap = new LongIntHashMap();
@@ -142,6 +134,70 @@ public class NodeToSequenceMap {
         };
     }
 
+    public Iterator<NodeSequence<SimpleNodeHandle>> nodeWithSequenceIterator() {
+        var smalls = nodesWithSmallSequences();
+
+        var longs = nodesWithLongSequences();
+        var iters = nodesWithMediumKnownSequences(smalls, longs);
+        return AutoClosedIterator.flatMap(iters);
+    }
+
+    private AutoClosedIterator<AutoClosedIterator<NodeSequence<SimpleNodeHandle>>> nodesWithMediumKnownSequences(AutoClosedIterator<NodeSequence<SimpleNodeHandle>> smalls, AutoClosedIterator<NodeSequence<SimpleNodeHandle>> longs) {
+        var mediums = from(nodeToShortSequenceMap.iterator());
+        var iters = AutoClosedIterator.of(smalls, mediums, longs);
+        return iters;
+    }
+
+    private class LongIntToSequence implements Function<LongIntPair, NodeSequence<SimpleNodeHandle>> {
+
+        @Override
+        public NodeSequence<SimpleNodeHandle> apply(LongIntPair p) {
+            var node = new SimpleNodeHandle(p.getOne());
+            var seq = getLongSequence(p.getTwo());
+            return new NodeSequence<>(node, seq);
+        }
+    }
+
+    private class LongToSequence implements Function<Long, NodeSequence<SimpleNodeHandle>> {
+
+        private final Sequence seq;
+
+        public LongToSequence(Sequence seq) {
+            this.seq = seq;
+        }
+
+        @Override
+        public NodeSequence<SimpleNodeHandle> apply(Long id) {
+            var node = new SimpleNodeHandle(id);
+            return new NodeSequence<>(node, seq);
+        }
+    }
+
+    private class SequenceAndRoaringBitMap implements
+            Function<Entry<Sequence, Roaring64Bitmap>, AutoClosedIterator<NodeSequence<SimpleNodeHandle>>> {
+
+        @Override
+        public AutoClosedIterator<NodeSequence<SimpleNodeHandle>> apply(Entry<Sequence, Roaring64Bitmap> en) {
+            Sequence s = en.getKey();
+            Roaring64Bitmap b = en.getValue();
+            return map(iteratorFromBitMap(b), new LongToSequence(s));
+        }
+
+    }
+
+    private AutoClosedIterator<NodeSequence<SimpleNodeHandle>> nodesWithLongSequences() {
+        var longToOffsetView = from(nodeToLongSequencePositionMap.keyValuesView()
+                .iterator());
+
+        var longs = map(longToOffsetView, new LongIntToSequence());
+        return longs;
+    }
+
+    private AutoClosedIterator<NodeSequence<SimpleNodeHandle>> nodesWithSmallSequences() {
+        var smalls = flatMap(map(fewNps.entrySet().iterator(), new SequenceAndRoaringBitMap()));
+        return smalls;
+    }
+
     public AutoClosedIterator<SimpleNodeHandle> nodesWithSequence(Sequence s) {
         if (s == null) {
             return empty();
@@ -164,12 +220,13 @@ public class NodeToSequenceMap {
         } else {
             long sl = sequenceAsLong(s);
             var from = from(nodeToShortSequenceMap.iterator());
-            Predicate<NodeSequence> filter = (ns) -> ns.sequence() == sl;
-            return map(filter(from, filter), ns -> new SimpleNodeHandle(ns.nodeId));
+            Predicate<NodeSequence<SimpleNodeHandle>> filter = (ns) -> sequenceAsLong(ns.sequence()) == sl;
+            Function<NodeSequence<SimpleNodeHandle>, SimpleNodeHandle> mapper = ns -> ns.node();
+            return map(filter(from, filter), mapper);
         }
     }
 
-    private long sequenceAsLong(Sequence s) {
+    private static long sequenceAsLong(Sequence s) {
         long sl = 0;
         if (s instanceof ShortKnownSequence) {
             sl = ((ShortKnownSequence) s).asLong();
@@ -192,16 +249,21 @@ public class NodeToSequenceMap {
         }
         var s = nodeToShortSequenceMap.iterateToLeft(handle.id());
         if (s.hasNext()) {
-            long sequence = s.next().sequence;
-            SequenceType fromLong = SequenceType.fromLong(sequence);
-            switch (fromLong) {
-                case SHORT_KNOWN:
-                    return new ShortKnownSequence(sequence);
-                case SHORT_AMBIGUOUS:
-                    return new ShortAmbiguousSequence(sequence);
-            }
+            return s.next().sequence();
         }
         throw new IllegalStateException("A simple node handle was passed in which does not have a sequence");
+    }
+
+    private static Sequence sequenceFromEncodedLong(long sequence) {
+        SequenceType fromLong = SequenceType.fromLong(sequence);
+        switch (fromLong) {
+            case SHORT_KNOWN:
+                return new ShortKnownSequence(sequence);
+            case SHORT_AMBIGUOUS:
+                return new ShortAmbiguousSequence(sequence);
+            default:
+                return null;
+        }
     }
 
     private Sequence getLongSequence(int offset) {
@@ -220,12 +282,12 @@ public class NodeToSequenceMap {
         if (sequence.length() <= FEW_NUCLEOTIDES_LIMIT) {
             fewNps.get(sequence).addLong(id);
         } else if (sequence.getType() == SequenceType.SHORT_KNOWN) {
-            long seq = ((ShortKnownSequence) sequence).asLong();
-            var ns = new NodeSequence(id, seq);
+            SimpleNodeHandle node = new SimpleNodeHandle(id);
+            var ns = new NodeSequence(node, sequence);
             nodeToShortSequenceMap.add(ns);
         } else if (sequence.getType() == SequenceType.SHORT_AMBIGUOUS) {
-            long seq = ((ShortAmbiguousSequence) sequence).asLong();
-            var ns = new NodeSequence(id, seq);
+            SimpleNodeHandle node = new SimpleNodeHandle(id);
+            var ns = new NodeSequence(node, sequence);
             nodeToShortSequenceMap.add(ns);
         } else {
             int at = longSequenceLinearLayout.size();

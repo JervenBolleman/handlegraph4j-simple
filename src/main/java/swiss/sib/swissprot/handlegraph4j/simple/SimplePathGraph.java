@@ -5,6 +5,7 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple;
 
+import io.github.vgteam.handlegraph4j.NodeSequence;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.*;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
 import io.github.vgteam.handlegraph4j.PathGraph;
@@ -20,7 +21,6 @@ import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import static java.util.Spliterator.SIZED;
 import static java.util.Spliterators.spliterator;
-import java.util.function.Function;
 import java.util.stream.LongStream;
 import java.util.stream.StreamSupport;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.NodeToSequenceMap;
@@ -333,4 +333,8 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
         }
     }
 
+    @Override
+    public AutoClosedIterator<NodeSequence<SimpleNodeHandle>> nodesWithTheirSequence() {
+        return from(nodeToSequenceMap.nodeWithSequenceIterator());
+    }
 }

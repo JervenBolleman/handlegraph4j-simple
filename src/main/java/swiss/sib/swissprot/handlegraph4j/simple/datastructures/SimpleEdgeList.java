@@ -5,10 +5,10 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
+import static swiss.sib.swissprot.handlegraph4j.simple.datastructures.LongLongSpinalList.ToLong;
 import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -23,11 +23,26 @@ public class SimpleEdgeList {
     
     private final LongLongSpinalList<SimpleEdgeHandle> kv;
     
+    private class GetLeftId implements ToLong<SimpleEdgeHandle>{
+
+        @Override
+        public long apply(SimpleEdgeHandle t) {
+            return t.left().id();
+        }
+    }
+    
+    private class GetRightId implements ToLong<SimpleEdgeHandle>{
+
+        @Override
+        public long apply(SimpleEdgeHandle t) {
+            return t.right().id();
+        }
+    }
     public SimpleEdgeList() {
         this.kv = new LongLongSpinalList<>(
                 SimpleEdgeHandle::new,
-                s -> s.left().id(),
-                s -> s.right().id(),
+                new GetLeftId(),
+                new GetRightId(),
                 new LeftThenRightOrder());
     }
     

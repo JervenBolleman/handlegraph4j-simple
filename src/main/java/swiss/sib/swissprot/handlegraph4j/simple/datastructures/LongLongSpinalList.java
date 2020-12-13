@@ -43,16 +43,27 @@ import me.lemire.integercompression.differential.IntegratedIntCompressor;
 public class LongLongSpinalList<T> {
 
     protected static final int CHUNK_SIZE = 32 * 1024;
-    private final BiFunction<Long, Long, T> reconstructor;
-    private final Function<T, Long> getKey;
-    private final Function<T, Long> getValue;
+    private final Reconstructor reconstructor;
+    private final ToLong getKey;
+    private final ToLong getValue;
     private final Comparator<T> comparator;
     private final ArrayList<Chunk<T>> chunks = new ArrayList<>();
     private BasicChunk<T> current;
 
-    public LongLongSpinalList(BiFunction<Long, Long, T> reconstructor,
-            Function<T, Long> getKey,
-            Function<T, Long> getValue,
+    @FunctionalInterface
+    public interface Reconstructor<T> {
+        public T apply(long key, long value);
+    }
+    
+    @FunctionalInterface
+    public interface ToLong<T> {
+        
+        public long apply(T t);
+    }
+    
+    public LongLongSpinalList(Reconstructor reconstructor,
+            ToLong getKey,
+            ToLong getValue,
             Comparator<T> comparator) {
         this.reconstructor = reconstructor;
         this.getKey = getKey;
@@ -66,10 +77,11 @@ public class LongLongSpinalList<T> {
     }
 
     public Iterator<T> iterator() {
-        Iterator<Iterator<T>> iterator = chunks.stream()
-                .map(Chunk::iterator)
+        Iterator<Chunk<T>> iterator = chunks
                 .iterator();
-        var toFlatMap = map(iterator, AutoClosedIterator::from);
+        var as = from(iterator);
+        var mapped = map(as, Chunk::iterator);
+        var toFlatMap = map(mapped, AutoClosedIterator::from);
         return flatMap(toFlatMap);
     }
 
@@ -127,7 +139,7 @@ public class LongLongSpinalList<T> {
         });
         var ensureKeySmallerThanLast = filter(ensureKeyGreaterThanFirst, c -> {
             long fetchedKey = c.lastKey();
-            return key >= fetchedKey;
+            return key <= fetchedKey;
         });
         var inChunkIters = map(ensureKeySmallerThanLast, Chunk::iterator);
         var closeables = map(inChunkIters, AutoClosedIterator::from);
@@ -283,7 +295,7 @@ public class LongLongSpinalList<T> {
 
     private static class CompressedChunck<T> implements Chunk<T> {
 
-        private final BiFunction<Long, Long, T> reconstructor;
+        private final Reconstructor<T> reconstructor;
         private final int firstKey;
         private final int firstValue;
         private final int lastKey;
@@ -293,9 +305,9 @@ public class LongLongSpinalList<T> {
         private static final int MAX = 1 << 30;
 
         public CompressedChunck(BasicChunk<T> from,
-                BiFunction<Long, Long, T> reconstructor,
-                Function<T, Long> getKey,
-                Function<T, Long> getValue) {
+                Reconstructor<T> reconstructor,
+                ToLong getKey,
+                ToLong getValue) {
             IntegratedIntCompressor iic = new IntegratedIntCompressor();
             int[] rawKeys = new int[from.keys.length - 2];
             for (int i = 1; i < from.keys.length - 1; i++) {
@@ -318,8 +330,8 @@ public class LongLongSpinalList<T> {
         }
 
         public static <T> boolean canCompress(BasicChunk<T> c,
-                Function<T, Long> getKey,
-                Function<T, Long> getValue) {
+                ToLong getKey,
+                ToLong getValue) {
             if (c.size != CHUNK_SIZE) {
                 return false;
             }
@@ -456,7 +468,7 @@ public class LongLongSpinalList<T> {
 
         private T reconstruct(int left,
                 int right,
-                BiFunction<Long, Long, T> reconstructor) {
+                Reconstructor<T> reconstructor) {
             long leftId = rotateLeft(left);
             long rightId = rotateLeft(right);
             return reconstructor.apply(leftId, rightId);
@@ -487,11 +499,11 @@ public class LongLongSpinalList<T> {
             private int cursor = 0;
             private final int[] keys;
             private final int[] values;
-            private final BiFunction<Long, Long, T> reconstructor;
+            private final Reconstructor<T> reconstructor;
 
             public Decompressing(int[] lefts,
                     int[] rights,
-                    BiFunction<Long, Long, T> reconstructor) {
+                    Reconstructor<T> reconstructor) {
                 this.keys = new IntegratedIntCompressor().uncompress(lefts);
                 this.values = new IntCompressor().uncompress(rights);
                 this.reconstructor = reconstructor;
@@ -518,14 +530,14 @@ public class LongLongSpinalList<T> {
         private long[] keys = new long[CHUNK_SIZE];
         private long[] values = new long[CHUNK_SIZE];
         private int size = 0;
-        private final BiFunction<Long, Long, T> reconstructor;
-        private final Function<T, Long> getKey;
-        private final Function<T, Long> getValue;
+        private final Reconstructor<T> reconstructor;
+        private final ToLong getKey;
+        private final ToLong getValue;
         private final Comparator<T> comparator;
 
-        public BasicChunk(BiFunction<Long, Long, T> reconstructor,
-                Function<T, Long> getKey,
-                Function<T, Long> getValue,
+        public BasicChunk(Reconstructor<T> reconstructor,
+                ToLong getKey,
+                ToLong getValue,
                 Comparator<T> comparator) {
             this.reconstructor = reconstructor;
             this.getKey = getKey;
@@ -577,7 +589,19 @@ public class LongLongSpinalList<T> {
 
         @Override
         public Iterator<T> iterator() {
-            return stream().iterator();
+            return new Iterator<T>(){
+                int cursor = 0;
+
+                @Override
+                public boolean hasNext() {
+                    return cursor < size;
+                }
+
+                @Override
+                public T next() {
+                    return reconstructor.apply(keys[cursor],values[cursor++]);
+                }
+            };
         }
 
         @Override
@@ -592,7 +616,7 @@ public class LongLongSpinalList<T> {
 
                 @Override
                 public boolean hasNext() {
-                    return cursor < keys.length;
+                    return cursor < size;
                 }
             };
         }
@@ -609,7 +633,7 @@ public class LongLongSpinalList<T> {
 
                 @Override
                 public boolean hasNext() {
-                    return cursor < values.length;
+                    return cursor < size;
                 }
             };
         }
