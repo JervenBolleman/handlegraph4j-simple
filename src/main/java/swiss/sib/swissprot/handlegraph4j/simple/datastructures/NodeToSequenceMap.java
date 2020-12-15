@@ -26,7 +26,6 @@ import io.github.vgteam.handlegraph4j.sequences.ShortAmbiguousSequence;
 import io.github.vgteam.handlegraph4j.sequences.ShortKnownSequence;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -45,7 +44,7 @@ import org.eclipse.collections.impl.list.mutable.primitive.LongArrayList;
 import org.eclipse.collections.impl.map.mutable.primitive.LongIntHashMap;
 import org.roaringbitmap.longlong.Roaring64Bitmap;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.LongLongSpinalList.ToLong;
+import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
 
 /**
  *
@@ -242,7 +241,7 @@ public class NodeToSequenceMap {
             int offset = nodeToLongSequenceOffsetMap.get(handle.id());
             return getLongSequence(offset);
         }
-        var s = nodeToShortSequenceMap.iterateToLeft(handle.id());
+        var s = nodeToShortSequenceMap.iterateWithKey(handle.id());
         if (s.hasNext()) {
             return s.next().sequence();
         }

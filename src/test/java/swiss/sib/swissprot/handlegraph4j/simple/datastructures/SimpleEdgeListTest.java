@@ -124,29 +124,6 @@ public class SimpleEdgeListTest {
         testIterator(length, instance);
     }
 
-    /**
-     * Test of iterator method, of class SimpleEdgeList.
-     */
-    @Test
-    public void testStreamGoingLeftWithEarlyTermination() {
-        SimpleEdgeList instance = new SimpleEdgeList();
-        int length = LongLongSpinalList.CHUNK_SIZE * 3;
-        for (int i = 0; i < length;) {
-            SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, ++i);
-            instance.add(eh);
-        }
-        instance.trimAndSort();
-        for (int i = 1; i < length; i += 2) {
-            try ( var stream = instance.streamToLeft(new SimpleNodeHandle(i))) {
-                var iterator = stream.iterator();
-                assertTrue(iterator.hasNext(), " at " + i);
-                SimpleEdgeHandle eh = new SimpleEdgeHandle(i, i + 1);
-                assertEquals(eh, iterator.next(), " at " + i);
-                assertFalse(iterator.hasNext(), " at " + i);
-            }
-        }
-    }
-
     @Test
     public void testIteratorGoingLeftWithEarlyTermination() {
         SimpleEdgeList instance = new SimpleEdgeList();
@@ -179,8 +156,7 @@ public class SimpleEdgeListTest {
             instance.add(eh);
         }
         instance.trimAndSort();
-        try ( var stream = instance.streamToRight(new SimpleNodeHandle(2))) {
-            var iterator = stream.iterator();
+        try ( var iterator = instance.iterateToRight(new SimpleNodeHandle(2))) {
             assertTrue(iterator.hasNext());
             SimpleEdgeHandle eh = new SimpleEdgeHandle(1, 2);
             assertEquals(eh, iterator.next());
