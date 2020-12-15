@@ -96,23 +96,9 @@
           <snapshots><enabled>true</enabled></snapshots>
         </repository>
         <repository>
-          <id>github-hg4j</id>
-          <name>GitHub Jerven Bolleman handlegraph4j Apache Maven Packages</name>
-          <url>https://maven.pkg.github.com/jervenbolleman/handlegraph4j</url>
-          <releases><enabled>true</enabled></releases>
-          <snapshots><enabled>true</enabled></snapshots>
-        </repository>
-        <repository>
-          <id>github-gfa</id>
+          <id>github</id>
           <name>GitHub Jerven Bolleman handlegraph4j Apache Maven Packages</name>
           <url>https://maven.pkg.github.com/jervenbolleman/handlegraph4jGFA</url>
-          <releases><enabled>true</enabled></releases>
-          <snapshots><enabled>true</enabled></snapshots>
-        </repository>
-        <repository>
-          <id>github-simple</id>
-          <name>GitHub Jerven Bolleman handlegraph4j Apache Maven Packages</name>
-          <url>https://maven.pkg.github.com/jervenbolleman/handlegraph4j-simple</url>
           <releases><enabled>true</enabled></releases>
           <snapshots><enabled>true</enabled></snapshots>
         </repository>
