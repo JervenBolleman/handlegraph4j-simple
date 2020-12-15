@@ -105,14 +105,12 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
 
     @Override
     public AutoClosedIterator<SimpleEdgeHandle> followEdgesToWardsTheRight(SimpleNodeHandle left) {
-        var i = edges.streamToLeft(left).iterator();
-        return from(i);
+        return edges.iterateToLeft(left);
     }
 
     @Override
     public AutoClosedIterator<SimpleEdgeHandle> followEdgesToWardsTheLeft(SimpleNodeHandle right) {
-        var i = edges.streamToRight(right).iterator();
-        return from(i);
+        return edges.iterateToRight(right);
     }
 
     @Override
