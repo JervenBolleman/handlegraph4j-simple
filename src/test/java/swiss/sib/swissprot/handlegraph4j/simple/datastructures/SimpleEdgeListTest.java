@@ -155,9 +155,8 @@ public class SimpleEdgeListTest {
             SimpleEdgeHandle eh = new SimpleEdgeHandle(++i, i);
             instance.add(eh);
         }
-//        assertEquals(96, instance.size());
         instance.trimAndSort();
-        assertEquals(96, instance.size());
+        assertEquals(LongLongSpinalList.CHUNK_SIZE * 3, instance.size());
         try ( var iterator = instance.iterateToLeft(new SimpleNodeHandle(3))) {
             assertTrue(iterator.hasNext(), " at " + 3);
         }
