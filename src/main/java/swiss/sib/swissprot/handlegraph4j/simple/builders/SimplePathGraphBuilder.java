@@ -11,7 +11,7 @@ import org.eclipse.collections.api.list.primitive.LongList;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathGraph;
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathHandle;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.NodeToSequenceMap;
+import swiss.sib.swissprot.handlegraph4j.simple.datastructures.InMemoryNodeToSequenceMap;
 
 /**
  *
@@ -19,7 +19,7 @@ import swiss.sib.swissprot.handlegraph4j.simple.datastructures.NodeToSequenceMap
  */
 class SimplePathGraphBuilder {
 
-    final NodeToSequenceMap nodeToSequenceMap = new NodeToSequenceMap();
+    final InMemoryNodeToSequenceMap nodeToSequenceMap = new InMemoryNodeToSequenceMap();
     final Map<String, SimplePathHandle> paths = new HashMap<>();
     final Map<SimplePathHandle, LongList> pathsToSteps = new HashMap<>();
     final SimpleEdgeList edges = new SimpleEdgeList();
