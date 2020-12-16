@@ -15,6 +15,7 @@ import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.flatMap;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
 import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
+import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -77,7 +78,7 @@ public class LongLongSpinalList<T> {
             int size = raf.readInt();
             read += Integer.BYTES;
             MappedByteBuffer map = raf.getChannel().map(READ_ONLY, read, size);
-            read+=size;
+            read += size;
             raf.seek(read);
             Type fromCode = Type.fromCode(type);
             switch (fromCode) {
