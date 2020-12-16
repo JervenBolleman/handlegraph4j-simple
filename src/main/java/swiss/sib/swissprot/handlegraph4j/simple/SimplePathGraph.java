@@ -11,10 +11,13 @@ import swiss.sib.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
 import io.github.vgteam.handlegraph4j.PathGraph;
 import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
-import java.util.Collections;
-import java.util.Iterator;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.PrimitiveIterator;
 import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.NONNULL;
@@ -23,6 +26,7 @@ import static java.util.Spliterator.SIZED;
 import static java.util.Spliterators.spliterator;
 import java.util.stream.LongStream;
 import java.util.stream.StreamSupport;
+import swiss.sib.swissprot.handlegraph4j.simple.datastructures.BufferedNodeToSequenceMap;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.NodeToSequenceMap;
 
 /**
@@ -32,49 +36,37 @@ import swiss.sib.swissprot.handlegraph4j.simple.datastructures.NodeToSequenceMap
 public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHandle, SimpleNodeHandle, SimpleEdgeHandle> {
 
     private final NodeToSequenceMap nodeToSequenceMap;
-    private final Map<String, SimplePathHandle> paths;
-    private final Map<SimplePathHandle, long[]> pathsToSteps;
+    private final Map<String, Path> pathsByName;
+    private final Map<SimplePathHandle, Path> pathsByHandle;
     private final SimpleEdgeList edges;
 
-    public SimplePathGraph(NodeToSequenceMap nodeToSequenceMap, Map<String, SimplePathHandle> paths, Map<SimplePathHandle, long[]> pathsToSteps, SimpleEdgeList edges) {
+    public SimplePathGraph(NodeToSequenceMap nodeToSequenceMap, Map<SimplePathHandle, Path> pathsToSteps, SimpleEdgeList edges) {
         this.nodeToSequenceMap = nodeToSequenceMap;
-        this.paths = paths;
-        this.pathsToSteps = pathsToSteps;
+        this.pathsByHandle = pathsToSteps;
+        this.pathsByName = new HashMap<>();
+        for (Path path : pathsByHandle.values()) {
+            pathsByName.put(path.name(), path);
+        }
         this.edges = edges;
     }
 
     @Override
     public AutoClosedIterator<SimplePathHandle> paths() {
-        return from(paths.values().iterator());
+        return from(pathsByHandle.keySet().iterator());
     }
 
     @Override
     public AutoClosedIterator<SimpleStepHandle> steps() {
-        var p = paths.values().iterator();
-        var i = new Iterator<Iterator<SimpleStepHandle>>() {
-
-            @Override
-            public boolean hasNext() {
-                return p.hasNext();
-            }
-
-            @Override
-            public Iterator<SimpleStepHandle> next() {
-                return stepsOf(p.next());
-            }
-        };
-        var ci = AutoClosedIterator.map(from(i), AutoClosedIterator::from);
-        return AutoClosedIterator.flatMap(ci);
+        return flatMap(map(paths(), ph -> stepsOf(ph)));
     }
 
     @Override
     public AutoClosedIterator<SimpleStepHandle> stepsOf(SimplePathHandle ph) {
-        long[] stepsOfPath = pathsToSteps.get(ph);
-        if (stepsOfPath != null) {
-            var i = new StepHandleIteratorImpl(stepsOfPath, ph.id());
-            return from(i);
+        Path p = pathsByHandle.get(ph);
+        if (p != null) {
+            return p.stepHandles();
         } else {
-            return from(Collections.emptyIterator());
+            return empty();
         }
     }
 
@@ -130,7 +122,7 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
 
     @Override
     public long stepCountInPath(SimplePathHandle p) {
-        return pathsToSteps.get(p).length;
+        return pathsByHandle.get(p).length();
     }
 
     @Override
@@ -138,51 +130,49 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
         return nodeToSequenceMap.getSequence(handle);
     }
 
-    private static class StepHandleIteratorImpl implements Iterator<SimpleStepHandle> {
+    public void writeTo(DataOutputStream raf) throws IOException {
+        nodeToSequenceMap.writeToDisk(raf);
+        edges.writeToDisk(raf);
+        raf.writeInt(pathsByHandle.size());
+        for (Path p : pathsByHandle.values()) {
+            Path.write(p, raf);
+        }
+    }
 
-        private final long[] steps;
-        private int rank = 0;
-        private final int pathId;
-
-        public StepHandleIteratorImpl(long[] steps, int pathId) {
-            this.steps = steps;
-            this.pathId = pathId;
+    public static SimplePathGraph open(RandomAccessFile raf) throws IOException {
+        var bufferedNodeToSequenceMap = new BufferedNodeToSequenceMap(raf);
+        var edges = new SimpleEdgeList();
+        edges.open(raf);
+        var pathsToSteps = new HashMap<SimplePathHandle, Path>();
+        int numberOfPaths = raf.readInt();
+        for (int i = 0; i < numberOfPaths; i++) {
+            Path p = Path.open(raf, bufferedNodeToSequenceMap);
+            pathsToSteps.put(p.pathHandle(), p);
         }
 
-        @Override
-        public boolean hasNext() {
-            return rank < steps.length;
-        }
-
-        @Override
-        public SimpleStepHandle next() {
-            int next = rank++;
-            long nodeId = steps[next];
-            return new SimpleStepHandle(pathId, nodeId, next);
-        }
+        return new SimplePathGraph(bufferedNodeToSequenceMap, pathsToSteps, edges);
     }
 
     @Override
     public boolean isCircular(SimplePathHandle path) {
-        long[] get = pathsToSteps.get(path);
-        long firstNodeId = get[0];
-        long lastNodeId = get[get.length - 1];
-        return firstNodeId == lastNodeId;
+        return pathsByHandle.get(path).isCircular();
     }
 
     @Override
     public String nameOfPath(SimplePathHandle p) {
-        for (Entry<String, SimplePathHandle> en : paths.entrySet()) {
-            if (en.getValue().equals(p)) {
-                return en.getKey();
-            }
+        if (pathsByHandle.containsKey(p)) {
+            return pathsByHandle.get(p).name();
         }
         return null;
     }
 
     @Override
     public SimplePathHandle pathByName(String name) {
-        return paths.get(name);
+        if (pathsByName.containsKey(name)) {
+            return pathsByName.get(name).pathHandle();
+        } else {
+            return null;
+        }
     }
 
     @Override
@@ -205,12 +195,9 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
         if (nodeToSequenceMap.areAllSequencesOneBaseLong()) {
             return s.rank();
         } else {
-            long[] stepNodeIds = pathsToSteps.get(new SimplePathHandle(s.pathId()));
-            long beginPosition = 0;
-            for (int i = 0; i < s.rank() && i < stepNodeIds.length; i++) {
-                beginPosition = beginPosition + sequenceOf(new SimpleNodeHandle(stepNodeIds[i])).length() + 1;
-            }
-            return beginPosition;
+            Path p = pathsByHandle.get(new SimplePathHandle(s.pathId()));
+            return p.beginPositionOfStep(s);
+
         }
     }
 
@@ -219,49 +206,42 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
         if (nodeToSequenceMap.areAllSequencesOneBaseLong()) {
             return s.rank() + 1;
         } else {
-            SimplePathHandle path = new SimplePathHandle(s.pathId());
-            long[] stepNodeIds = pathsToSteps.get(path);
-            long endPosition = 0;
-            for (int i = 0; i <= s.rank() && i < stepNodeIds.length; i++) {
-                var simpleNodeHandle = new SimpleNodeHandle(stepNodeIds[i]);
-                Sequence sequenceOf = sequenceOf(simpleNodeHandle);
-                endPosition = endPosition + sequenceOf.length() + 1;
-            }
-            return endPosition;
+            Path p = pathsByHandle.get(new SimplePathHandle(s.pathId()));
+            return p.endPositionOfStep(s);
         }
     }
 
     @Override
     public SimpleStepHandle stepByRankAndPath(SimplePathHandle path, long rank) {
-        long nodeIdOfStep = pathsToSteps.get(path)[(int) rank];
-        return new SimpleStepHandle(path.id(), nodeIdOfStep, rank);
+        Path p = pathsByHandle.get(path);
+        return p.stepHandlesByRank(rank);
+
     }
 
     @Override
     public AutoClosedIterator<SimpleNodeHandle> nodesWithSequence(Sequence s) {
         return nodeToSequenceMap.nodesWithSequence(s);
-        
+
     }
 
     @Override
     public LongStream positionsOf(SimplePathHandle p) {
         // If all sequences are of length one we know exactly which positions 
         // are possible
+        var path = pathsByHandle.get(p);
         if (nodeToSequenceMap.areAllSequencesOneBaseLong()) {
             return LongStream.range(1, this.stepCountInPath(p) + 1);
         } else {
             var primitiveIter = new PrimitiveIterator.OfLong() {
                 private long beginPosition = 0;
-                final long[] stepNodeIds = pathsToSteps.get(p);
+                private final AutoClosedIterator<SimpleNodeHandle> nodes = path.nodeHandles();
                 boolean begin = true;
-                private int at = 0;
 
                 @Override
                 public long nextLong() {
                     if (begin) {
                         long toReturn = beginPosition;
-                        long next = stepNodeIds[at++];
-                        var node = new SimpleNodeHandle(next);
+                        var node = nodes.next();
                         int length = sequenceOf(node).length();
                         beginPosition += length;
                         begin = false;
@@ -277,14 +257,14 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
                     if (!begin) {
                         return true;
                     } else {
-                        return at < stepNodeIds.length;
+                        return nodes.hasNext();
                     }
                 }
 
             };
 
             var si = spliterator(primitiveIter,
-                    pathsToSteps.get(p).length * 2,
+                    path.length() * 2,
                     SIZED | ORDERED | DISTINCT | NONNULL);
             return StreamSupport.longStream(si, false);
         }
@@ -296,15 +276,20 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
         if (nodeToSequenceMap.areAllSequencesOneBaseLong()) {
             return stepByRankAndPath(path, position);
         } else {
-            final long[] stepNodeIds = pathsToSteps.get(path);
-            long beginPosition = 0;
-            for (int rank = 0; rank < stepNodeIds.length; rank++) {
-                var node = new SimpleNodeHandle(stepNodeIds[rank]);
-                beginPosition = beginPosition + sequenceOf(node).length() + 1;
-                if (beginPosition == position) {
-                    return stepByRankAndPath(path, rank);
-                } else if (beginPosition >= position) {
-                    return null;
+            Path p = pathsByHandle.get(path);
+            try ( var stepHandles = p.stepHandles()) {
+                long beginPosition = 0;
+                while (stepHandles.hasNext()) {
+                    SimpleStepHandle step = stepHandles.next();
+                    var nodeId = step.nodeId();
+                    var node = new SimpleNodeHandle(nodeId);
+                    int seqLen = sequenceOf(node).length();
+                    beginPosition = beginPosition + seqLen + 1;
+                    if (beginPosition == position) {
+                        return step;
+                    } else if (beginPosition >= position) {
+                        return null;
+                    }
                 }
             }
             return null;
@@ -316,15 +301,19 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
         if (nodeToSequenceMap.areAllSequencesOneBaseLong()) {
             return stepByRankAndPath(path, position + 1);
         } else {
-            long[] stepNodeIds = pathsToSteps.get(path);
-            long endPosition = 0;
-            for (int rank = 0; rank < stepNodeIds.length; rank++) {
-                var node = new SimpleNodeHandle(stepNodeIds[rank]);
-                endPosition = endPosition + sequenceOf(node).length();
-                if (endPosition == position) {
-                    return stepByRankAndPath(path, rank);
-                } else if (endPosition >= position) {
-                    return null;
+            Path p = pathsByHandle.get(path);
+            try ( var stepHandles = p.stepHandles()) {
+                long endPosition = 0;
+                while (stepHandles.hasNext()) {
+                    var step = stepHandles.next();
+                    var node = new SimpleNodeHandle(step.nodeId());
+                    int length = sequenceOf(node).length();
+                    endPosition = endPosition + length;
+                    if (endPosition == position) {
+                        return step;
+                    } else if (endPosition >= position) {
+                        return null;
+                    }
                 }
             }
             return null;

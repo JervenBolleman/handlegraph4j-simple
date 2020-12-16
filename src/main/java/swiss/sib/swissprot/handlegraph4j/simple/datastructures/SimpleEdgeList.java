@@ -6,6 +6,11 @@
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
 import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import java.io.BufferedOutputStream;
+import java.io.DataOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Spliterators;
@@ -25,6 +30,14 @@ public class SimpleEdgeList {
 
     public long size() {
         return kv.size();
+    }
+
+    public void writeToDisk(DataOutputStream raf) throws IOException {
+        kv.toStream(raf);
+    }
+    
+    public void open(RandomAccessFile raf) throws IOException {
+        kv.fromStream(raf);
     }
 
     private class GetLeftId implements ToLong<SimpleEdgeHandle> {

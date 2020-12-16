@@ -6,6 +6,7 @@ package swiss.sib.swissprot.handlegraph4j.simple.datastructures.chunks;
  * and open the template in the editor.
  */
 import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Iterator;
@@ -68,7 +69,7 @@ public interface Chunk<T> {
         return AutoClosedIterator.terminate(iterator, next -> getKey.apply(next) == key);
     }
 
-    public void toStream(OutputStream stream) throws IOException;
+    public void toStream(DataOutputStream stream) throws IOException;
 
     public Type getType();
 

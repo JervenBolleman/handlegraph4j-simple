@@ -15,13 +15,10 @@ import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.flatMap;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
 import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
-import io.github.vgteam.handlegraph4j.sequences.Sequence;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 import static java.nio.channels.FileChannel.MapMode.READ_ONLY;
 
 import java.util.ArrayList;
@@ -62,7 +59,8 @@ public class LongLongSpinalList<T> {
         this.comparator = comparator;
     }
 
-    public void toStream(OutputStream stream) throws IOException {
+    public void toStream(DataOutputStream stream) throws IOException {
+        stream.writeInt(chunks.size());
         for (Chunk<T> chunk : chunks) {
             stream.write(chunk.getType().getCode());
             chunk.toStream(stream);
@@ -70,16 +68,12 @@ public class LongLongSpinalList<T> {
     }
 
     public void fromStream(RandomAccessFile raf) throws IOException {
-        long max = raf.length() - 5;
-        int read = 0;
-        while (read < max) {
+        int noOfChunks = raf.readInt();
+        while (chunks.size() < noOfChunks) {
             byte type = raf.readByte();
-            read++;
             int size = raf.readInt();
-            read += Integer.BYTES;
-            MappedByteBuffer map = raf.getChannel().map(READ_ONLY, read, size);
-            read += size;
-            raf.seek(read);
+            MappedByteBuffer map = raf.getChannel().map(READ_ONLY, raf.getFilePointer(), size);
+            raf.seek(raf.getFilePointer()+size);
             Type fromCode = Type.fromCode(type);
             switch (fromCode) {
                 case BASIC:
@@ -311,7 +305,7 @@ public class LongLongSpinalList<T> {
         }
 
         @Override
-        public void toStream(OutputStream stream) throws IOException {
+        public void toStream(DataOutputStream stream) throws IOException {
             throw new UnsupportedOperationException(NOT_SUPPORTED);
         }
 

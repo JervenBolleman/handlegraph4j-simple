@@ -8,6 +8,7 @@ package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 import swiss.sib.swissprot.handlegraph4j.simple.functions.LongLongToObj;
 import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import java.io.BufferedOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -143,8 +144,9 @@ public class LongLongSpinalListTest {
     }
 
     private void compareToDisk(File tmp, LongLongSpinalList instance) throws IOException {
-        try ( BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(tmp))) {
-            instance.toStream(bos);
+        try ( BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(tmp)); 
+                DataOutputStream dos = new DataOutputStream(bos)) {
+            instance.toStream(dos);
         }
 
         var fd = new LongLongSpinalList<>(name, gk, gv, comp);

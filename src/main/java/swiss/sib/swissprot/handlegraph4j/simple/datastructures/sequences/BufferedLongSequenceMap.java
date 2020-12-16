@@ -12,10 +12,17 @@ import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.from;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import io.github.vgteam.handlegraph4j.sequences.LongSequence;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.LongBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel.MapMode;
 import java.util.Iterator;
 import java.util.PrimitiveIterator.OfLong;
 import org.eclipse.collections.api.iterator.LongIterator;
-import org.eclipse.collections.impl.list.mutable.primitive.LongArrayList;
+import org.eclipse.collections.api.list.primitive.LongList;
+import org.eclipse.collections.api.tuple.primitive.LongIntPair;
 import org.eclipse.collections.impl.map.mutable.primitive.LongIntHashMap;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 
@@ -23,21 +30,46 @@ import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
  *
  * @author Jerven Bolleman <jerven.bolleman@sib.swiss>
  */
-public class LongSequenceMap implements NodeSequenceMap {
+public class BufferedLongSequenceMap implements NodeSequenceMap {
 
-    final LongIntHashMap nodesWithLongSequences;
-    final LongArrayList longSequenceLinearLayout;
-
-    public LongSequenceMap(LongIntHashMap nodesWithLongSequences,
-            LongArrayList longSequenceLinearLayout) {
-        this.nodesWithLongSequences = nodesWithLongSequences;
-        this.longSequenceLinearLayout = longSequenceLinearLayout;
+    public static void writeToDisk(LongSequenceMap nodesWithLongSequences, DataOutputStream raf) throws IOException {
+        
+        writeSequences(raf, nodesWithLongSequences.longSequenceLinearLayout);
+        writeOffsetMap(raf, nodesWithLongSequences.nodesWithLongSequences);
     }
 
-    public LongSequenceMap() {
+    private final LongIntHashMap nodesWithLongSequences;
+    private final LongBuffer longSequenceLinearLayout;
 
-        this.nodesWithLongSequences = new LongIntHashMap();
-        this.longSequenceLinearLayout = new LongArrayList();
+    public BufferedLongSequenceMap(RandomAccessFile raf) throws IOException {
+        int size = raf.readInt() * Long.BYTES;
+        long start = raf.getFilePointer();
+        MappedByteBuffer map = raf.getChannel().map(MapMode.READ_ONLY, start, size);
+        this.longSequenceLinearLayout = map.asLongBuffer();
+        raf.seek(raf.getFilePointer() + map.limit());
+        size = raf.readInt();
+        this.nodesWithLongSequences = new LongIntHashMap(size);
+        for (int i = 0; i < size; i++) {
+            nodesWithLongSequences.put(raf.readLong(), raf.readInt());
+        }
+    }
+
+    private static void writeOffsetMap(DataOutputStream raf, LongIntHashMap nodesWithLongSequences1) throws IOException {
+        raf.writeInt(nodesWithLongSequences1.size());
+        Iterator<LongIntPair> iterator = nodesWithLongSequences1.keyValuesView().iterator();
+        while (iterator.hasNext()) {
+            LongIntPair next = iterator.next();
+            raf.writeLong(next.getOne());
+            raf.writeInt(next.getTwo());
+        }
+    }
+
+    private static void writeSequences(DataOutputStream raf, LongList linear) throws IOException {
+        raf.writeInt(linear.size());        
+        LongIterator longIterator = linear.longIterator();
+        while (longIterator.hasNext()) {
+            raf.writeLong(longIterator.next());
+        }
     }
 
     @Override
@@ -69,23 +101,22 @@ public class LongSequenceMap implements NodeSequenceMap {
 
     @Override
     public void add(long id, Sequence sequence) {
-        int at = longSequenceLinearLayout.size();
-        int size = sequence.length();
-        long[] s = ((LongSequence) sequence).array();
-        int longs = s.length;
-        longSequenceLinearLayout.add(id);
-        long sizeAndLongs = (((long) size) << 32) | (long) longs;
-        longSequenceLinearLayout.add(sizeAndLongs);
-        for (int i = 0; i < longs; i++) {
-            longSequenceLinearLayout.add(s[i]);
-        }
-        nodesWithLongSequences.put(id, at);
+//        int at = longSequenceLinearLayout.size();
+//        int size = sequence.length();
+//        long[] s = ((LongSequence) sequence).array();
+//        int longs = s.length;
+//        longSequenceLinearLayout.add(id);
+//        long sizeAndLongs = (((long) size) << 32) | (long) longs;
+//        longSequenceLinearLayout.add(sizeAndLongs);
+//        for (int i = 0; i < longs; i++) {
+//            longSequenceLinearLayout.add(s[i]);
+//        }
+//        nodesWithLongSequences.put(id, at);
     }
 
     @Override
     public void trim() {
         nodesWithLongSequences.compact();
-        longSequenceLinearLayout.trimToSize();
     }
 
     @Override
@@ -144,17 +175,17 @@ public class LongSequenceMap implements NodeSequenceMap {
     private static class LinearLongSequenceIterator
             implements Iterator<NodeSequence<SimpleNodeHandle>> {
 
-        private final LongArrayList longSequenceLinearLayout;
+        private final LongBuffer longSequenceLinearLayout;
 
         int offset = 0;
 
-        private LinearLongSequenceIterator(LongArrayList longSequenceLinearLayout) {
+        private LinearLongSequenceIterator(LongBuffer longSequenceLinearLayout) {
             this.longSequenceLinearLayout = longSequenceLinearLayout;
         }
 
         @Override
         public boolean hasNext() {
-            return offset < longSequenceLinearLayout.size();
+            return offset < longSequenceLinearLayout.limit();
         }
 
         @Override

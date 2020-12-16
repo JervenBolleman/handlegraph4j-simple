@@ -7,22 +7,23 @@ package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
 import io.github.vgteam.handlegraph4j.NodeSequence;
 import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.filter;
-import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.of;
 import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
+import static java.util.Spliterators.spliteratorUnknownSize;
+import static java.util.Spliterator.NONNULL;
+import static java.util.Spliterator.DISTINCT;
 
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import io.github.vgteam.handlegraph4j.sequences.SequenceType;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.Iterator;
 import java.util.List;
 import java.util.PrimitiveIterator.OfLong;
-import static java.util.Spliterator.DISTINCT;
-import static java.util.Spliterator.NONNULL;
-import static java.util.Spliterators.spliteratorUnknownSize;
 import java.util.function.LongFunction;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
@@ -30,28 +31,28 @@ import java.util.stream.StreamSupport;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences.BufferedLongSequenceMap;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences.BufferedShortSequenceMap;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences.LongSequenceMap;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences.MediumSequenceMap;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences.ShortSequenceMap;
+import swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences.NodeSequenceMap;
 
 /**
  *
  * @author Jerven Bolleman <jerven.bolleman@sib.swiss>
  */
-public class InMemoryNodeToSequenceMap implements NodeToSequenceMap {
+public class BufferedNodeToSequenceMap implements NodeToSequenceMap {
 
-    private final ShortSequenceMap nodesWithShortSequences;
-    private final MediumSequenceMap nodesWithMediumSequences;
-    private final LongSequenceMap nodesWithLongSequences;
+    private final BufferedShortSequenceMap nodesWithShortSequences;
+    private final NodeSequenceMap nodesWithMediumSequences;
+    private final NodeSequenceMap nodesWithLongSequences;
 
     private long maxNodeId;
 
-    public InMemoryNodeToSequenceMap() {
-        this.nodesWithMediumSequences = new MediumSequenceMap();
-        this.nodesWithShortSequences = new ShortSequenceMap();
-        this.nodesWithLongSequences = new LongSequenceMap();
-    }
 
+
+    public BufferedNodeToSequenceMap(RandomAccessFile raf) throws IOException {
+        this.nodesWithShortSequences = new BufferedShortSequenceMap(raf);
+        this.nodesWithMediumSequences = MediumSequenceMap.open(raf);
+        this.nodesWithLongSequences = new BufferedLongSequenceMap(raf);
+    }
     @Override
     public Stream<SimpleNodeHandle> nodes() {
         return nodesIds()
@@ -86,10 +87,8 @@ public class InMemoryNodeToSequenceMap implements NodeToSequenceMap {
     }
 
     @Override
-    public void writeToDisk(DataOutputStream raf) throws IOException {
-        BufferedShortSequenceMap.writeToDisk(nodesWithShortSequences, raf);
-        MediumSequenceMap.writeToDisk(nodesWithMediumSequences, raf);
-        BufferedLongSequenceMap.writeToDisk(nodesWithLongSequences, raf);
+    public void writeToDisk(DataOutputStream raf) {
+//        nodesWithShortSequences.w
     }
 
     public static class AttachNodeToSequence
