@@ -6,11 +6,17 @@
 package swiss.sib.swissprot.handlegraph4j.simple.builders;
 
 import io.github.vgteam.handlegraph4j.gfa1.GFA1Reader;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.Arrays;
 import java.util.PrimitiveIterator;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.io.TempDir;
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathGraph;
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleStepHandle;
@@ -21,6 +27,8 @@ import swiss.sib.swissprot.handlegraph4j.simple.SimpleStepHandle;
  */
 public class SimplePathGraphFromGFA1BuilderTest {
 
+    @TempDir
+    File anotherTempDir;
     private static final String TEST_DATA = "H\tVN:Z:1.0\n"
             + "S\t1\tCAAATAAG\n"
             + "S\t2\tA\n"
@@ -37,6 +45,7 @@ public class SimplePathGraphFromGFA1BuilderTest {
             + "S\t13\tA\n"
             + "S\t14\tT\n"
             + "S\t15\tCCAACTCTCTG\n"
+            + "S\t16\tCCAACTCTCTGCCAACTCTCTGCCAACTCTCTGCCAACTCTCTGCCAACTCTCTGCCAACTCTCTGCCAACTCTCTGCCAACTCTCTGCCAACTCTCTGCCAACTCTCTGCCAACTCTCTGCCAACTCTCTGCCAACTCTCTG\n"
             + "P\tx\t1+,3+,5+,6+,8+,9+,11+,12+,14+,15+,3+\t8M,1M,1M,3M,1M,19M,1M,4M,1M,11M\n"
             + "P\ty\t1+,3+,5+,6+,8+,9+,11+,12+,14+,15+,1+\t8M,1M,1M,3M,1M,19M,1M,4M,1M,11M\n"
             + "L\t1\t+\t2\t+\t0M\n"
@@ -152,7 +161,26 @@ public class SimplePathGraphFromGFA1BuilderTest {
                 assertNotNull(nodes.next());
                 count++;
             }
-            assertEquals(15, count);
+            assertEquals(16, count);
+        }
+    }
+
+    @Test
+    public void testNumberOfNodesAfterRereading() throws IOException {
+        GFA1Reader gFA1Reader = new GFA1Reader(Arrays.asList(TEST_DATA.split("\n")).iterator());
+        SimplePathGraphFromGFA1Builder instance = new SimplePathGraphFromGFA1Builder();
+        instance.parse(gFA1Reader);
+        SimplePathGraph graph = instance.build();
+        File tmp = new File(anotherTempDir, "ll");
+        boolean createNewFile = tmp.createNewFile();
+        assertTrue(createNewFile);
+        try ( FileOutputStream raf = new FileOutputStream(tmp);  DataOutputStream das = new DataOutputStream(raf)) {
+            graph.writeTo(das);
+        }
+
+        try ( RandomAccessFile raf2 = new RandomAccessFile(tmp, "rw")) {
+            SimplePathGraph graph2 = SimplePathGraph.open(raf2);
+            assertEquals(graph.nodeCount(), graph2.nodeCount());
         }
     }
 }

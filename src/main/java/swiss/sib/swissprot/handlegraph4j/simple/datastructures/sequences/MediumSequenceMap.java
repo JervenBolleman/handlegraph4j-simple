@@ -14,6 +14,9 @@ import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import io.github.vgteam.handlegraph4j.sequences.SequenceType;
 import io.github.vgteam.handlegraph4j.sequences.ShortAmbiguousSequence;
 import io.github.vgteam.handlegraph4j.sequences.ShortKnownSequence;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.PrimitiveIterator;
 import java.util.function.Predicate;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
@@ -25,6 +28,22 @@ import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
  * @author Jerven Bolleman <jerven.bolleman@sib.swiss>
  */
 public class MediumSequenceMap implements NodeSequenceMap {
+
+    public static void writeToDisk(MediumSequenceMap nodesWithMediumSequences, DataOutputStream raf) throws IOException {        
+        nodesWithMediumSequences.nodeSequences.toStream(raf);
+    }
+
+    public static NodeSequenceMap open(RandomAccessFile raf) throws IOException {
+        ToLong<NodeSequence<SimpleNodeHandle>> gn = MediumSequenceMap::getNodeId;
+        ToLong<NodeSequence<SimpleNodeHandle>> gs = MediumSequenceMap::getSequenceAsLong;
+        var nodeSequences = new LongLongSpinalList<>(
+                MediumSequenceMap::reconstruct,
+                gn,
+                gs,
+                MediumSequenceMap::compareNodeSequence);
+        nodeSequences.fromStream(raf);
+        return new MediumSequenceMap(nodeSequences);
+    }
 
     private final LongLongSpinalList<NodeSequence<SimpleNodeHandle>> nodeSequences;
 
@@ -119,6 +138,7 @@ public class MediumSequenceMap implements NodeSequenceMap {
         return nodeSequences.size();
     }
 
+    @Override
     public AutoClosedIterator<SimpleNodeHandle> nodeWithSequences(Sequence s) {
         long sl = sequenceAsLong(s);
         var from = from(nodeSequences());
@@ -131,5 +151,28 @@ public class MediumSequenceMap implements NodeSequenceMap {
         SimpleNodeHandle node = new SimpleNodeHandle(id);
         var ns = new NodeSequence(node, sequence);
         add(ns);
+    }
+
+    @Override
+    public boolean containsSequence(Sequence s) {
+        long sl = sequenceAsLong(s);
+        try ( AutoClosedIterator<NodeSequence<SimpleNodeHandle>> nodeSequences1 = nodeSequences()) {
+            var from = from(nodeSequences1);
+            Predicate<NodeSequence<SimpleNodeHandle>> filter = (ns) -> sequenceAsLong(ns.sequence()) == sl;
+            return filter(from, filter).hasNext();
+        }
+    }
+
+    @Override
+    public int maxSequenceLength() {
+
+        PrimitiveIterator.OfLong valueIterator = nodeSequences.valueIterator();
+        int max = 0;
+        while (valueIterator.hasNext()) {
+            long next = valueIterator.next();
+            int length = sequenceFromEncodedLong(next).length();
+            max = Math.max(max, length);
+        }
+        return max;
     }
 }

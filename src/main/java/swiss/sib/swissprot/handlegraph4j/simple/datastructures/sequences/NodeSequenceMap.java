@@ -33,4 +33,8 @@ public interface NodeSequenceMap {
 
     public AutoClosedIterator<SimpleNodeHandle> nodeWithSequences(Sequence s);
 
+    public boolean containsSequence(Sequence s);
+
+    public int maxSequenceLength();
+
 }

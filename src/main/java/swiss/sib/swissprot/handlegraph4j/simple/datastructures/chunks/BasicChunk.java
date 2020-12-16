@@ -6,6 +6,7 @@
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures.chunks;
 
 import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -204,7 +205,7 @@ public class BasicChunk<T> implements Chunk<T> {
     }
 
     @Override
-    public void toStream(OutputStream stream) throws IOException {
+    public void toStream(DataOutputStream stream) throws IOException {
         sort();
         new BasicBufferedChunk<>(this).toStream(stream);
     }

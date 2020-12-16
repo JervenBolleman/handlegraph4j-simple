@@ -6,14 +6,13 @@
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures.chunks;
 
 import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
 import me.lemire.integercompression.IntCompressor;
 import me.lemire.integercompression.differential.IntegratedIntCompressor;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.LongLongSpinalList;
 import swiss.sib.swissprot.handlegraph4j.simple.functions.LongLongToObj;
 import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
 
@@ -267,7 +266,7 @@ public class CompressedChunk<T> implements Chunk<T> {
     }
 
     @Override
-    public void toStream(OutputStream stream) throws IOException {
+    public void toStream(DataOutputStream stream) throws IOException {
         sort();
         new CompressedBufferedChunk<>(this, reconstructor, getKey).toStream(stream);
     }
