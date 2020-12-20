@@ -12,6 +12,8 @@ import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.from;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import io.github.vgteam.handlegraph4j.sequences.LongSequence;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -33,7 +35,7 @@ import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 public class BufferedLongSequenceMap implements NodeSequenceMap {
 
     public static void writeToDisk(LongSequenceMap nodesWithLongSequences, DataOutputStream raf) throws IOException {
-        
+
         writeSequences(raf, nodesWithLongSequences.longSequenceLinearLayout);
         writeOffsetMap(raf, nodesWithLongSequences.nodesWithLongSequences);
     }
@@ -49,10 +51,33 @@ public class BufferedLongSequenceMap implements NodeSequenceMap {
         raf.seek(raf.getFilePointer() + map.limit());
         size = raf.readInt();
         this.nodesWithLongSequences = new LongIntHashMap(size);
-        for (int i = 0; i < size; i++) {
+        int max = size * (Long.BYTES + Integer.BYTES);
+        int stepSize = (Long.BYTES + Integer.BYTES) * VALUES_PER_READ;
+        int steps = max / stepSize;
+        readInByteArrayBlocks(steps, stepSize, raf);
+        readInLastElements(size, raf);
+    }
+
+    private void readInLastElements(int size, RandomAccessFile raf) throws IOException {
+        for (int i = nodesWithLongSequences.size(); i < size; i++) {
             nodesWithLongSequences.put(raf.readLong(), raf.readInt());
         }
     }
+
+    private void readInByteArrayBlocks(int steps, int stepSize, RandomAccessFile raf) throws IOException {
+        for (int i = 0; i < steps; i ++) {
+            byte[] temp = new byte[stepSize];
+            int read = raf.read(temp);
+            assert read != -1;
+            assert read == stepSize;
+            try ( ByteArrayInputStream bin = new ByteArrayInputStream(temp);  DataInputStream dis = new DataInputStream(bin)) {
+                for (int j = 0; j < VALUES_PER_READ; j++) {
+                    nodesWithLongSequences.put(dis.readLong(), dis.readInt());
+                }
+            }
+        }
+    }
+    private static final int VALUES_PER_READ = 512;
 
     private static void writeOffsetMap(DataOutputStream raf, LongIntHashMap nodesWithLongSequences1) throws IOException {
         raf.writeInt(nodesWithLongSequences1.size());
@@ -65,7 +90,7 @@ public class BufferedLongSequenceMap implements NodeSequenceMap {
     }
 
     private static void writeSequences(DataOutputStream raf, LongList linear) throws IOException {
-        raf.writeInt(linear.size());        
+        raf.writeInt(linear.size());
         LongIterator longIterator = linear.longIterator();
         while (longIterator.hasNext()) {
             raf.writeLong(longIterator.next());
