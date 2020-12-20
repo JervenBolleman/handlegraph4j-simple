@@ -19,7 +19,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,10 +42,11 @@ import swiss.sib.swissprot.handlegraph4j.simple.datastructures.BufferedNodeToSeq
  */
 public class BufferedShortSequenceMap implements NodeSequenceMap {
 
-    private final Map<Sequence, List<ImmutableRoaringBitmap>> fewNps = new HashMap<>();
+    private final Map<Sequence, List<ImmutableRoaringBitmap>> fewNps;
 
     public BufferedShortSequenceMap(RandomAccessFile raf) throws IOException {
         int noOfsequences = raf.readInt();
+        fewNps = new HashMap<>(noOfsequences);
         for (int i = 0; i < noOfsequences; i++) {
             long seqAsLong = raf.readLong();
             Sequence st = readSequence(seqAsLong);
@@ -196,7 +196,8 @@ public class BufferedShortSequenceMap implements NodeSequenceMap {
 
             @Override
             public long nextLong() {
-                long id = (long) current.next();
+                int raw = current.next();
+                long id = (long) raw;
                 return id | (index << Integer.BYTES * 8);
             }
 
