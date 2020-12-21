@@ -29,7 +29,7 @@ import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
  */
 public class MediumSequenceMap implements NodeSequenceMap {
 
-    public static void writeToDisk(MediumSequenceMap nodesWithMediumSequences, DataOutputStream raf) throws IOException {        
+    public static void writeToDisk(MediumSequenceMap nodesWithMediumSequences, DataOutputStream raf) throws IOException {
         nodesWithMediumSequences.nodeSequences.toStream(raf);
     }
 
@@ -66,9 +66,9 @@ public class MediumSequenceMap implements NodeSequenceMap {
     private static long sequenceAsLong(Sequence s) {
         long sl = 0;
         if (s instanceof ShortKnownSequence) {
-            sl = ((ShortKnownSequence) s).asLong();
+            return ((ShortKnownSequence) s).asLong();
         } else if (s instanceof ShortAmbiguousSequence) {
-            sl = ((ShortAmbiguousSequence) s).asLong();
+            return ((ShortAmbiguousSequence) s).asLong();
         }
         return sl;
     }
@@ -97,7 +97,8 @@ public class MediumSequenceMap implements NodeSequenceMap {
     public Sequence getSequence(long id) {
         var s = nodeSequences.iterateWithKey(id);
         if (s.hasNext()) {
-            return s.next().sequence();
+            NodeSequence<SimpleNodeHandle> next = s.next();
+            return next.sequence();
         }
         return null;
     }
@@ -110,6 +111,7 @@ public class MediumSequenceMap implements NodeSequenceMap {
             case SHORT_AMBIGUOUS:
                 return new ShortAmbiguousSequence(sequence);
             default:
+                assert false : "Not valid sequence " + sequence;
                 return null;
         }
     }

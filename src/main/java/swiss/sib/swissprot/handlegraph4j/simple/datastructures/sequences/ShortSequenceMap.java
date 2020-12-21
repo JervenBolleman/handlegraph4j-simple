@@ -13,7 +13,6 @@ import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import io.github.vgteam.handlegraph4j.sequences.SequenceType;
-import io.github.vgteam.handlegraph4j.sequences.ShortAmbiguousSequence;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -35,22 +34,24 @@ import swiss.sib.swissprot.handlegraph4j.simple.datastructures.BufferedNodeToSeq
  * @author Jerven Bolleman <jerven.bolleman@sib.swiss>
  */
 public class ShortSequenceMap implements NodeSequenceMap {
-
+    //32 is the normal max sequence length of VG
+    private static final int MAX_FOR_SHORT_SEQUENCE = 32;
     final Map<Sequence, List<RoaringBitmap>> fewNps = new HashMap<>();
 
     public ShortSequenceMap() {
         init();
-        for (int i = 4; i < ShortAmbiguousSequence.MAX_LENGTH; i++) {
+        for (int i = 4; i < MAX_FOR_SHORT_SEQUENCE; i++) {
             byte[] nn = new byte[i];
             Arrays.fill(nn, (byte) 'n');
             RoaringBitmap roaring64Bitmap = new RoaringBitmap();
             var bitmaps = new ArrayList<RoaringBitmap>();
             bitmaps.add(roaring64Bitmap);
-            fewNps.put(new ShortAmbiguousSequence(nn), bitmaps);
+            fewNps.put(SequenceType.fromByteArray(nn), bitmaps);
         }
     }
 
     private void init() {
+        //Generate all possible sequences length 1 to 3.
         for (Character ch1 : Sequence.KNOWN_IUPAC_CODES) {
             byte b1 = (byte) ch1.charValue();
             initSequenceAndBitmaps(b1);
@@ -72,13 +73,14 @@ public class ShortSequenceMap implements NodeSequenceMap {
         fewNps.put(seq, bitmaps);
     }
 
+    @Override
     public boolean containsSequence(Sequence s) {
         return fewNps.containsKey(s);
     }
 
     @Override
     public void add(long id, Sequence sequence) {
-        int index = (int) (id >>> 32);
+        int index = (int) (id >>> MAX_FOR_SHORT_SEQUENCE);
         fewNps.get(sequence).get(index).add((int) id);
     }
 
@@ -195,7 +197,7 @@ public class ShortSequenceMap implements NodeSequenceMap {
 
     @Override
     public Sequence getSequence(long id) {
-        int index = (int) (id >>> 32);
+        int index = (int) (id >>> MAX_FOR_SHORT_SEQUENCE);
         for (Entry<Sequence, List<RoaringBitmap>> en : fewNps.entrySet()) {
             if (en.getValue().size() > index) {
                 RoaringBitmap rb = en.getValue().get(index);

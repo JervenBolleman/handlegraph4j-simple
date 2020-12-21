@@ -7,6 +7,7 @@ package swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences;
 
 import io.github.vgteam.handlegraph4j.sequences.LongSequence;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
+import io.github.vgteam.handlegraph4j.sequences.SequenceType;
 import io.github.vgteam.handlegraph4j.sequences.ShortKnownSequence;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -16,6 +17,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,8 +43,14 @@ public class BufferedShortSequenceMapTest {
     public void testWriteToDisk() throws IOException {
         ShortSequenceMap nodesWithSequences = new ShortSequenceMap();
         String[] nucleotides = new String[]{"a", "c", "t", "g"};
-        for (int i = 0; i < 2067; i++) {           
+        for (int i = 0; i < 2067; i++) {
             addNucleotide(nucleotides[i % nucleotides.length], nodesWithSequences, i);
+        }
+        for (int i = 1; i < 32; i++) {
+            byte[] s = new byte[i];
+            Arrays.fill(s, (byte) 'n');
+            Sequence seq = SequenceType.fromByteArray(s);
+            nodesWithSequences.add(nodesWithSequences.size()+1, seq);
         }
         testEquivalence(nodesWithSequences);
 

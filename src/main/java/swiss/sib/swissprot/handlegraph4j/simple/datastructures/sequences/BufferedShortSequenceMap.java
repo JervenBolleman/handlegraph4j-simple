@@ -48,8 +48,7 @@ public class BufferedShortSequenceMap implements NodeSequenceMap {
         int noOfsequences = raf.readInt();
         fewNps = new HashMap<>(noOfsequences);
         for (int i = 0; i < noOfsequences; i++) {
-            long seqAsLong = raf.readLong();
-            Sequence st = readSequence(seqAsLong);
+            Sequence st = readSequence(raf);
 
             long maps = raf.readInt();
             List<ImmutableRoaringBitmap> list = new ArrayList<>();
@@ -71,8 +70,7 @@ public class BufferedShortSequenceMap implements NodeSequenceMap {
         Iterator<Sequence> seqs = ssm.fewNps.keySet().iterator();
         for (int i = 0; i < noOfsequences; i++) {
             Sequence seq = seqs.next();
-            long ls = sequenceToLong(seq);
-            raf.writeLong(ls);
+            sequenceToLong(seq, raf);
             List<RoaringBitmap> list = ssm.fewNps.get(seq);
 //            long maps = raf.readInt();
             raf.writeInt(list.size());
@@ -84,28 +82,38 @@ public class BufferedShortSequenceMap implements NodeSequenceMap {
         }
     }
 
-    private static long sequenceToLong(Sequence seq) throws IllegalStateException {
-
+    private static void sequenceToLong(Sequence seq, DataOutputStream raf)
+            throws IllegalStateException, IOException {
+        raf.writeLong(seq.getType().code());
         if (seq instanceof ShortKnownSequence) {
-            return ((ShortKnownSequence) seq).asLong();
+            raf.writeLong(((ShortKnownSequence) seq).asLong());
         } else if (seq instanceof ShortAmbiguousSequence) {
-            return ((ShortAmbiguousSequence) seq).asLong();
+            raf.writeLong(((ShortAmbiguousSequence) seq).asLong());
         } else {
-            throw new IllegalStateException();
+            raf.writeInt(seq.length());
+            for (int i = 0; i < seq.length(); i++) {
+                raf.write(seq.byteAt(i));
+            }
         }
     }
 
-    private Sequence readSequence(long seqAsLong) throws IllegalStateException {
-        SequenceType st = SequenceType.fromLong(seqAsLong);
+    private Sequence readSequence(RandomAccessFile raf)
+            throws IllegalStateException, IOException {
+        SequenceType st = SequenceType.fromLong(raf.readLong());
         switch (st) {
             case SHORT_AMBIGUOUS:
-                return new ShortAmbiguousSequence(seqAsLong);
+                return new ShortAmbiguousSequence(raf.readLong());
 
             case SHORT_KNOWN:
-                return new ShortKnownSequence(seqAsLong);
-
-            default:
-                throw new IllegalStateException();
+                return new ShortKnownSequence(raf.readLong());
+            default: {
+                int length = raf.readInt();
+                byte[] bytes = new byte[length];
+                for (int i =0;i<length;i++){
+                    bytes[i]=raf.readByte();
+                }
+                return SequenceType.fromByteArray(bytes);
+            }
         }
     }
 

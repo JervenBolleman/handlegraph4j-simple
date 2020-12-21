@@ -82,7 +82,7 @@ public class BufferedNodeToSequenceMap implements NodeToSequenceMap {
 
         var longs = nodesWithLongSequences.nodeSequences();
         var mediums = nodesWithMediumSequences.nodeSequences();
-        var iters = of(smalls, mediums, longs);
+        var iters = of(longs, mediums, smalls);
         return AutoClosedIterator.flatMap(iters);
     }
 

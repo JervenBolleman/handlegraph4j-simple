@@ -131,12 +131,12 @@ public class SimplePathGraphFromGFA1BuilderTest {
                 11, 12,
                 13, 16,
                 17, 18,
-                19, 31,
-                32, 33,
-                34, 38,
+                19, 38,
                 39, 40,
-                41, 52,
-                53, 54};
+                41, 45,
+                46, 47,
+                48, 59,
+                60, 61};
             for (int i = 0; i < expectedPositions.length; i++) {
                 assertTrue(iterator.hasNext());
                 assertEquals(expectedPositions[i], iterator.next());

@@ -81,7 +81,7 @@ public class InMemoryNodeToSequenceMap implements NodeToSequenceMap {
 
         var longs = nodesWithLongSequences.nodeSequences();
         var mediums = nodesWithMediumSequences.nodeSequences();
-        var iters = of(smalls, mediums, longs);
+        var iters = of(mediums, smalls,longs);
         return AutoClosedIterator.flatMap(iters);
     }
 
