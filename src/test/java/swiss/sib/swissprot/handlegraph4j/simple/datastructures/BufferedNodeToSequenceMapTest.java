@@ -5,8 +5,6 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
-import io.github.vgteam.handlegraph4j.NodeSequence;
-import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import static io.github.vgteam.handlegraph4j.sequences.SequenceType.fromString;
 import java.io.DataOutputStream;
@@ -15,9 +13,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.util.Iterator;
-import java.util.PrimitiveIterator;
-import java.util.stream.LongStream;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,6 +32,8 @@ public class BufferedNodeToSequenceMapTest {
 
     /**
      * Test of nodes method, of class BufferedNodeToSequenceMap.
+     *
+     * @throws java.io.IOException
      */
     @Test
     public void testRandomAccess() throws IOException {
@@ -48,7 +45,7 @@ public class BufferedNodeToSequenceMapTest {
         orig.trim();
         assertEquals(seq, orig.getSequence(new SimpleNodeHandle(id)));
         File file = writeToDisk(orig);
-        try ( RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
 
             BufferedNodeToSequenceMap instance = new BufferedNodeToSequenceMap(raf);
 
@@ -63,28 +60,44 @@ public class BufferedNodeToSequenceMapTest {
         Sequence seq = fromString("CGGCAGAGCTCCCTCCTCAGCACACGG");
         Sequence seq2 = fromString("CGGCAGAGCTCCCTCCTCAGCACACGC");
         Sequence seq3 = fromString("CGGCAGAGCTCCCTCCTCAGCACACGT");
+        Sequence seq4 = fromString("CGGCAGAGCTCCCTCCTCAGCACACGTCGGCAGAGCTCCCTCCTCAGCACACGTCGGCAGAGCTCCCTCCTCAGCACACGT");
+        Sequence seq5 = fromString("CGGCAGAGCTCCCTCCTCAGCACACGTCGGCAGAGCTCCCTCCTCAGCACACGTCGGCAGAGCTCCCTCCTCAGCACACGTA");
         int id = 142537850;
-        add(orig, id, seq);
         int idTwo = 142537851;
         int idThree = 1422337851;
+        int idFour = 1422337891;
+        int idFive = 1422337892;
+        add(orig, id, seq);
         add(orig, idTwo, seq2);
         add(orig, idThree, seq3);
+        add(orig, idFour, seq4);
+        add(orig, idFive, seq5);
         orig.trim();
+        Sequence origSeq4 = orig.getSequence(new SimpleNodeHandle(idFour));
+
+        assertEquals(seq4, origSeq4);
+
         assertEquals(seq, orig.getSequence(new SimpleNodeHandle(id)));
         assertEquals(seq2, orig.getSequence(new SimpleNodeHandle(idTwo)));
+        assertEquals(seq3, orig.getSequence(new SimpleNodeHandle(idThree)));
+
+        assertEquals(seq5, orig.getSequence(new SimpleNodeHandle(idFive)));
         File file = writeToDisk(orig);
-        try ( RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
 
             BufferedNodeToSequenceMap instance = new BufferedNodeToSequenceMap(raf);
 
             assertEquals(seq, instance.getSequence(new SimpleNodeHandle(id)));
             assertEquals(seq2, instance.getSequence(new SimpleNodeHandle(idTwo)));
+            assertEquals(seq3, instance.getSequence(new SimpleNodeHandle(idThree)));
+            assertEquals(seq4, instance.getSequence(new SimpleNodeHandle(idFour)));
+            assertEquals(seq5, instance.getSequence(new SimpleNodeHandle(idFive)));
         }
     }
 
     private File writeToDisk(InMemoryNodeToSequenceMap orig) throws IOException {
         File file = new File(temp, "tt");
-        try ( OutputStream os = new FileOutputStream(file);  DataOutputStream raf = new DataOutputStream(os)) {
+        try (OutputStream os = new FileOutputStream(file); DataOutputStream raf = new DataOutputStream(os)) {
             orig.writeToDisk(raf);
         }
         return file;

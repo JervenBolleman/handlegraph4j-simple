@@ -62,9 +62,9 @@ public class LongSequenceMap implements NodeSequenceMap {
         int longs = (int) sizeAndLongs;
         long[] seq = new long[longs];
         for (int i = 0; i < longs; i++) {
-            seq[i] = longSequenceLinearLayout.get(offset + i + 1);
+            seq[i] = longSequenceLinearLayout.get(offset + i + 2);
         }
-        return new LongSequence(seq, (int) size);
+        return new LongSequence(seq, size);
     }
 
     @Override
