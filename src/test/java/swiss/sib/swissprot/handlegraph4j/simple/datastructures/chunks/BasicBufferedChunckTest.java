@@ -128,8 +128,9 @@ public class BasicBufferedChunckTest {
         try ( AutoClosedIterator<long[]> iter = cc.fromKey(500, gk)) {
             int i = 500;
             while (iter.hasNext()) {
-                assertEquals(i, iter.next()[0]);
-                assertEquals(i, iter.next()[1]);
+                long[] next = iter.next();
+                assertEquals(i, next[0]);
+                assertEquals(i, next[1]);
                 i++;
             }
             assertFalse(iter.hasNext());

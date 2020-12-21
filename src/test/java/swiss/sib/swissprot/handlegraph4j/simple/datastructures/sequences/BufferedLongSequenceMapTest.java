@@ -32,13 +32,19 @@ public class BufferedLongSequenceMapTest {
 
     /**
      * Test of writeToDisk method, of class BufferedLongSequenceMap.
+     *
      * @Throws IOException
      */
     @Test
     public void testWriteToDisk() throws IOException {
         LongSequenceMap nodesWithLongSequences = new LongSequenceMap();
-        byte[] bytes = "actgactgactgactgactgactgactgactg".getBytes(StandardCharsets.US_ASCII);
-        nodesWithLongSequences.add(0, new LongSequence(bytes));
+        addSequence("actgactgactgactgactgactgactgactg", nodesWithLongSequences, 0);
+        addSequence("CGGCAGAGCTCCCTCCTCAGCACACGG", nodesWithLongSequences, 1);
+        testReadinback(nodesWithLongSequences);
+
+    }
+
+    private void testReadinback(LongSequenceMap nodesWithLongSequences) throws IOException {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         try ( DataOutputStream raf = new DataOutputStream(byteArrayOutputStream)) {
             BufferedLongSequenceMap.writeToDisk(nodesWithLongSequences, raf);
@@ -62,38 +68,21 @@ public class BufferedLongSequenceMapTest {
             }
             assertFalse(writtenNodeSequence.hasNext());
         }
-
     }
-    
-     @Test
+
+    private void addSequence(String sequence, LongSequenceMap nodesWithLongSequences, int id) {
+        byte[] bytes = sequence.getBytes(StandardCharsets.US_ASCII);
+        nodesWithLongSequences.add(id, new LongSequence(bytes));
+    }
+
+    @Test
     public void testBigWriteToDisk() throws IOException {
         LongSequenceMap nodesWithLongSequences = new LongSequenceMap();
         byte[] bytes = "actgactgactgactgactgactgactgactg".getBytes(StandardCharsets.US_ASCII);
-        for (int i =0; i< 1047;i++)
+        for (int i = 0; i < 1047; i++) {
             nodesWithLongSequences.add(i, new LongSequence(bytes));
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        try ( DataOutputStream raf = new DataOutputStream(byteArrayOutputStream)) {
-            BufferedLongSequenceMap.writeToDisk(nodesWithLongSequences, raf);
         }
-        File file = new File(temp, "tt");
-        try ( OutputStream os = new FileOutputStream(file)) {
-            os.write(byteArrayOutputStream.toByteArray());
-
-        }
-        try ( RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-            BufferedLongSequenceMap blsm = new BufferedLongSequenceMap(raf);
-            assertEquals(nodesWithLongSequences.size(), blsm.size());
-            var writtenNodeSequence = nodesWithLongSequences.nodeSequences();
-            var readNodeSequences = blsm.nodeSequences();
-            while (readNodeSequences.hasNext()) {
-                assertTrue(writtenNodeSequence.hasNext());
-                var wnNext = writtenNodeSequence.next();
-                var rdNext = readNodeSequences.next();
-                assertEquals(wnNext.node(), rdNext.node());
-                assertEquals(wnNext.sequence(), rdNext.sequence());
-            }
-            assertFalse(writtenNodeSequence.hasNext());
-        }
+        testReadinback(nodesWithLongSequences);
 
     }
 }

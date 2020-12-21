@@ -139,7 +139,7 @@ public class BufferedNodeToSequenceMap implements NodeToSequenceMap {
             return seq;
         }
 
-        throw new IllegalStateException("A simple node handle was passed in which does not have a sequence");
+        throw new IllegalStateException("A simple node handle was passed in which does not have a sequence:"+ handle.id());
     }
 
     public void add(long id, Sequence sequence) {

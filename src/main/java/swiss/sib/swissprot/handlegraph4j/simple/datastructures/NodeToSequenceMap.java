@@ -10,7 +10,6 @@ import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
 import java.util.stream.LongStream;

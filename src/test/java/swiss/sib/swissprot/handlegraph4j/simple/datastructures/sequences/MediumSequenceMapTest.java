@@ -8,6 +8,7 @@ package swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import io.github.vgteam.handlegraph4j.sequences.SequenceType;
 import io.github.vgteam.handlegraph4j.sequences.ShortAmbiguousSequence;
+import static java.nio.charset.StandardCharsets.US_ASCII;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,5 +41,17 @@ public class MediumSequenceMapTest {
             Sequence seq = SequenceType.fromByteArray(s);
             assertEquals(seq, instance.getSequence(i));
         }
+
+    }
+
+    @Test
+    public void testAdd_NodeSequence2() {
+        MediumSequenceMap instance = new MediumSequenceMap();
+
+        Sequence seq = SequenceType.fromByteArray("CGGCAGAGCTCCCTCCTCAGCACACGG".getBytes(US_ASCII));
+        instance.add(0, seq);
+
+        instance.trim();
+        assertEquals(seq, instance.getSequence(0));
     }
 }

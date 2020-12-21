@@ -130,26 +130,28 @@ public class BasicBufferedChunk<T> implements Chunk<T> {
     }
 
     private int skipToKey(long key) {
-        int index = binarySearch(buffer, Long.BYTES, Long.BYTES + (Long.BYTES * (int) size()), key);
+        if (size() == 1)
+            return 0;
+        int index = binarySearch(buffer, 1, 1+ (int) size(), key)  - 1;
         while (index > 1 && getKey(index - 1) == key) {
             index--;
         }
-        return index - 1; // compensate for the offset
+        return index; // compensate for the offset
     }
 
     private static int binarySearch(ByteBuffer lb, int fromIndex, int toIndex,
             long key) {
         int low = fromIndex;
-        int high = toIndex - Long.BYTES;
+        int high = toIndex - 1;
 
         while (low <= high) {
-            int mid = (low + high) >>> Long.BYTES;
-            long midVal = lb.getLong(mid);
+            int mid = (low + high) >>> 1;
+            long midVal = lb.getLong(mid * Long.BYTES);
 
             if (midVal < key) {
-                low = mid + Long.BYTES;
+                low = mid + 1;
             } else if (midVal > key) {
-                high = mid - Long.BYTES;
+                high = mid - 1;
             } else {
                 return mid; // found
             }

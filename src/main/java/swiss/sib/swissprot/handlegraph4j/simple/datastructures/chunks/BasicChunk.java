@@ -66,6 +66,11 @@ public class BasicChunk<T> implements Chunk<T> {
             }
             keys = sortedKeys;
             values = sortedValues;
+        } else if (size  == 1) {
+            long key = keys[0];
+            long value = values[0];
+            keys = new long[]{key};
+            values = new long[]{value};
         }
     }
 
