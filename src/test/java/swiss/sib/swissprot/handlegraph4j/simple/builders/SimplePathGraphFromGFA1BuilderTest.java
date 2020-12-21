@@ -83,13 +83,13 @@ public class SimplePathGraphFromGFA1BuilderTest {
         instance.parse(gFA1Reader);
         SimplePathGraph graph = instance.build();
         assertFalse(graph.isEmpty());
-        try ( var paths = graph.paths()) {
+        try (var paths = graph.paths()) {
             assertTrue(paths.hasNext());
             SimplePathHandle path = paths.next();
             assertNotNull(path);
             assertEquals("x", graph.nameOfPath(path));
 
-            try ( var steps = graph.stepsOf(path)) {
+            try (var steps = graph.stepsOf(path)) {
                 int[] expectedNodeIds = new int[]{1, 3, 5, 6, 8, 9, 11, 12, 14, 15, 3};
                 int expectedRank = 0;
                 for (int expectedNodeId : expectedNodeIds) {
@@ -120,7 +120,7 @@ public class SimplePathGraphFromGFA1BuilderTest {
         instance.parse(gFA1Reader);
         SimplePathGraph graph = instance.build();
         assertFalse(graph.isEmpty());
-        try ( var paths = graph.paths()) {
+        try (var paths = graph.paths()) {
             assertTrue(paths.hasNext());
             SimplePathHandle path = paths.next();
             assertNotNull(path);
@@ -140,6 +140,14 @@ public class SimplePathGraphFromGFA1BuilderTest {
             for (int i = 0; i < expectedPositions.length; i++) {
                 assertTrue(iterator.hasNext());
                 assertEquals(expectedPositions[i], iterator.next());
+                var s = graph.stepByRankAndPath(path, i / 2);
+                if (i % 2 == 0) {
+                    long bpos = graph.beginPositionOfStep(s);
+                    assertEquals(expectedPositions[i], bpos, " at step " + s);
+                } else {
+                    long bpos = graph.endPositionOfStep(s);
+                    assertEquals(expectedPositions[i], bpos, " at step " + s);
+                }
             }
             assertFalse(iterator.hasNext());
         }
@@ -155,7 +163,7 @@ public class SimplePathGraphFromGFA1BuilderTest {
         instance.parse(gFA1Reader);
         SimplePathGraph graph = instance.build();
         assertFalse(graph.isEmpty());
-        try ( var nodes = graph.nodes()) {
+        try (var nodes = graph.nodes()) {
             long count = 0;
             while (nodes.hasNext()) {
                 assertNotNull(nodes.next());
@@ -174,11 +182,11 @@ public class SimplePathGraphFromGFA1BuilderTest {
         File tmp = new File(anotherTempDir, "ll");
         boolean createNewFile = tmp.createNewFile();
         assertTrue(createNewFile);
-        try ( FileOutputStream raf = new FileOutputStream(tmp);  DataOutputStream das = new DataOutputStream(raf)) {
+        try (FileOutputStream raf = new FileOutputStream(tmp); DataOutputStream das = new DataOutputStream(raf)) {
             graph.writeTo(das);
         }
 
-        try ( RandomAccessFile raf2 = new RandomAccessFile(tmp, "rw")) {
+        try (RandomAccessFile raf2 = new RandomAccessFile(tmp, "rw")) {
             SimplePathGraph graph2 = SimplePathGraph.open(raf2);
             assertEquals(graph.nodeCount(), graph2.nodeCount());
         }

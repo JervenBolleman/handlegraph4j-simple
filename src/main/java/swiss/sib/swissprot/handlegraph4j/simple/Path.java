@@ -39,13 +39,21 @@ public class Path {
 
     static void write(Path path, DataOutputStream raf) throws IOException {
         raf.writeInt(path.id);
+        writeName(path, raf);
+        writeSteps(raf, path);
+    }
+
+    private static void writeName(Path path, DataOutputStream raf) throws IOException {
         char[] chName = path.name.toCharArray();
         raf.writeInt(chName.length);
         for (char c : chName) {
             raf.writeChar(c);
         }
+    }
+
+    private static void writeSteps(DataOutputStream raf, Path path) throws IOException {
         raf.writeLong(path.steps.length());
-        try ( var nodes = path.nodeHandles()) {
+        try (var nodes = path.nodeHandles()) {
             while (nodes.hasNext()) {
                 raf.writeLong(nodes.next().id());
             }
@@ -85,19 +93,24 @@ public class Path {
     }
 
     public long endPositionOfStep(SimpleStepHandle s) {
-        try ( AutoClosedIterator<SimpleNodeHandle> nodes = steps.nodes()) {
+        try (AutoClosedIterator<SimpleNodeHandle> nodes = steps.nodes()) {
             long endPosition = 0;
-            for (int i = 0; i <= s.rank() && nodes.hasNext(); i++) {
+            for (int i = 0; nodes.hasNext(); i++) {
                 var node = nodes.next();
                 int seqLen = nodeToSequenceMap.getSequence(node).length();
-                endPosition = endPosition + seqLen + 1;
+                endPosition = endPosition + seqLen;
+                if (i == s.rank()) {
+                    return endPosition;
+                } else {
+                    endPosition++;
+                }
             }
             return endPosition;
         }
     }
 
     long beginPositionOfStep(SimpleStepHandle s) {
-        try ( AutoClosedIterator<SimpleNodeHandle> nodes = steps.nodes()) {
+        try (AutoClosedIterator<SimpleNodeHandle> nodes = steps.nodes()) {
             long beginPosition = 0;
             for (int i = 0; i < s.rank() && nodes.hasNext(); i++) {
                 var node = nodes.next();

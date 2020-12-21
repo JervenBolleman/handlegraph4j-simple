@@ -11,9 +11,7 @@ import swiss.sib.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
 import io.github.vgteam.handlegraph4j.PathGraph;
 import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.HashMap;
@@ -39,7 +37,7 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     private final Map<String, Path> pathsByName;
     private final Map<SimplePathHandle, Path> pathsByHandle;
     private final SimpleEdgeList edges;
-
+    
     public SimplePathGraph(NodeToSequenceMap nodeToSequenceMap, Map<SimplePathHandle, Path> pathsToSteps, SimpleEdgeList edges) {
         this.nodeToSequenceMap = nodeToSequenceMap;
         this.pathsByHandle = pathsToSteps;
