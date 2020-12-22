@@ -37,7 +37,7 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     private final Map<String, Path> pathsByName;
     private final Map<SimplePathHandle, Path> pathsByHandle;
     private final SimpleEdgeList edges;
-    
+
     public SimplePathGraph(NodeToSequenceMap nodeToSequenceMap, Map<SimplePathHandle, Path> pathsToSteps, SimpleEdgeList edges) {
         this.nodeToSequenceMap = nodeToSequenceMap;
         this.pathsByHandle = pathsToSteps;
@@ -275,7 +275,7 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
             return stepByRankAndPath(path, position);
         } else {
             Path p = pathsByHandle.get(path);
-            try ( var stepHandles = p.stepHandles()) {
+            try (var stepHandles = p.stepHandles()) {
                 long beginPosition = 0;
                 while (stepHandles.hasNext()) {
                     SimpleStepHandle step = stepHandles.next();
@@ -300,7 +300,7 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
             return stepByRankAndPath(path, position + 1);
         } else {
             Path p = pathsByHandle.get(path);
-            try ( var stepHandles = p.stepHandles()) {
+            try (var stepHandles = p.stepHandles()) {
                 long endPosition = 0;
                 while (stepHandles.hasNext()) {
                     var step = stepHandles.next();
@@ -322,4 +322,18 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     public AutoClosedIterator<NodeSequence<SimpleNodeHandle>> nodesWithTheirSequence() {
         return from(nodeToSequenceMap.nodeWithSequenceIterator());
     }
+
+    @Override
+    public int pathCount() {
+        return pathsByName.size();
+    }
+
+    @Override
+    public long stepCount() {
+        return pathsByHandle.values()
+                .stream()
+                .mapToLong(Path::length)
+                .sum();
+    }
+
 }
