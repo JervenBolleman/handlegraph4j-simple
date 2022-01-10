@@ -10,7 +10,7 @@ import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.filter;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
-import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.of;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.concat;
 import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
 
 import io.github.vgteam.handlegraph4j.sequences.Sequence;
@@ -81,8 +81,8 @@ public class InMemoryNodeToSequenceMap implements NodeToSequenceMap {
 
         var longs = nodesWithLongSequences.nodeSequences();
         var mediums = nodesWithMediumSequences.nodeSequences();
-        var iters = of(mediums, smalls,longs);
-        return AutoClosedIterator.flatMap(iters);
+        var iters = concat(concat(mediums, smalls),longs);
+        return iters;
     }
 
     @Override

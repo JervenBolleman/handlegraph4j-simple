@@ -10,7 +10,7 @@ import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.filter;
-import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.of;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.concat;
 import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
 import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.Spliterator.NONNULL;
@@ -82,8 +82,8 @@ public class BufferedNodeToSequenceMap implements NodeToSequenceMap {
 
         var longs = nodesWithLongSequences.nodeSequences();
         var mediums = nodesWithMediumSequences.nodeSequences();
-        var iters = of(longs, mediums, smalls);
-        return AutoClosedIterator.flatMap(iters);
+        var iters = concat(concat(longs, mediums), smalls);
+        return iters;
     }
 
     @Override
