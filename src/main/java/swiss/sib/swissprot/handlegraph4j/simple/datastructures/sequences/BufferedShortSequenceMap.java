@@ -42,7 +42,9 @@ import swiss.sib.swissprot.handlegraph4j.simple.datastructures.BufferedNodeToSeq
  */
 public class BufferedShortSequenceMap implements NodeSequenceMap {
 
-    private final Map<Sequence, List<ImmutableRoaringBitmap>> fewNps;
+    private static final int NOT_FOUND = -404;
+	private final Map<Sequence, List<ImmutableRoaringBitmap>> fewNps;
+    private final Map<Integer, List<RoaringBitmap>> lengthBitmaps = new HashMap<>();
 
     public BufferedShortSequenceMap(RandomAccessFile raf) throws IOException {
         int noOfsequences = raf.readInt();
@@ -62,7 +64,28 @@ public class BufferedShortSequenceMap implements NodeSequenceMap {
             }
             fewNps.put(st, list);
         }
+        
+        fillLengthBitMaps(lengthBitmaps, fewNps);
     }
+
+	static void fillLengthBitMaps(Map<Integer, List<RoaringBitmap>> lengthBitmaps, Map<Sequence, List<ImmutableRoaringBitmap>> fewNps) {
+		for (Map.Entry<Sequence, List<ImmutableRoaringBitmap>> en:fewNps.entrySet()) {
+        	Sequence seq = en.getKey();
+        	if (! lengthBitmaps.containsKey(seq.length())) {
+        		lengthBitmaps.put(seq.length(), new ArrayList<>());
+        	}
+        	List<RoaringBitmap> list = lengthBitmaps.get(seq.length());
+        	List<ImmutableRoaringBitmap> value = en.getValue();
+			for (int i=0;i<value.size();i++) {
+				if (list.size() <= i) {
+					list.add(new RoaringBitmap(value.get(i)));
+				} else {
+					list.get(i).or(new RoaringBitmap(value.get(i)));
+				}
+			}
+        }
+		lengthBitmaps.values().stream().flatMap(List::stream).forEach(RoaringBitmap::runOptimize);
+	}
 
     public static void writeToDisk(ShortSequenceMap ssm, DataOutputStream raf) throws IOException, IllegalStateException {
         int noOfsequences = ssm.fewNps.size();
@@ -72,9 +95,11 @@ public class BufferedShortSequenceMap implements NodeSequenceMap {
             Sequence seq = seqs.next();
             sequenceToLong(seq, raf);
             List<RoaringBitmap> list = ssm.fewNps.get(seq);
-//            long maps = raf.readInt();
             raf.writeInt(list.size());
             for (RoaringBitmap rb : list) {
+            	if (! rb.hasRunCompression()) {
+            		rb.runOptimize();
+            	}
                 int bits = rb.serializedSizeInBytes();
                 raf.writeInt(bits);
                 rb.serialize(raf);
@@ -240,4 +265,20 @@ public class BufferedShortSequenceMap implements NodeSequenceMap {
         }
         return null;
     }
+
+	public int getSequenceLength(long id) {
+		int index = (int) (id >>> 32);
+		RoaringBitmap toTest = new RoaringBitmap();
+		toTest.add((int) id);
+		toTest.runOptimize();
+        for (Entry<Integer, List<RoaringBitmap>> en : lengthBitmaps.entrySet()) {
+            if (en.getValue().size() > index) {
+                RoaringBitmap rb = en.getValue().get(index);
+                if (RoaringBitmap.andCardinality(rb, toTest) > 0) {
+                	return en.getKey();
+                }
+            }
+        }
+        return NOT_FOUND;
+	}
 }

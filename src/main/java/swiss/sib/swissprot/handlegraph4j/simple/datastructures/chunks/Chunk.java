@@ -1,16 +1,12 @@
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures.chunks;
 
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
+
+
+import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
 
 /**
@@ -32,7 +28,7 @@ public interface Chunk<T> {
     public Iterator<T> iterator(int start);
 
     public PrimitiveIterator.OfLong keyIterator();
-
+    
     public PrimitiveIterator.OfLong valueIterator();
 
     T first();
@@ -65,7 +61,7 @@ public interface Chunk<T> {
         } else if (key > lastKey()) {
             return AutoClosedIterator.empty();
         }
-        io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator<T> iterator = AutoClosedIterator.from(iterator());
+        AutoClosedIterator<T> iterator = AutoClosedIterator.from(iterator());
         return AutoClosedIterator.terminate(iterator, next -> getKey.apply(next) == key);
     }
 

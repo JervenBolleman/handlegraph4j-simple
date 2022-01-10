@@ -85,8 +85,15 @@ public class BasicBufferedChunk<T> implements Chunk<T> {
             }
         };
     }
+    
+    
 
     @Override
+	public boolean hasKey(long key) {
+		return indexesOfKey(key).hasNext();
+	}
+
+	@Override
     public PrimitiveIterator.OfLong valueIterator() {
         return new PrimitiveIterator.OfLong() {
             int cursor = 0;

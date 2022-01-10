@@ -141,6 +141,25 @@ public class BufferedNodeToSequenceMap implements NodeToSequenceMap {
 
         throw new IllegalStateException("A simple node handle was passed in which does not have a sequence:"+ handle.id());
     }
+    
+    @Override
+    public int getSequenceLength(SimpleNodeHandle handle) {
+        int seqL = nodesWithShortSequences.getSequenceLength(handle.id());
+        if (seqL > 0) {
+            return seqL;
+        } else {
+        seqL = nodesWithLongSequences.getSequenceLength(handle.id());
+        if (seqL > 0) {
+            return seqL;
+        }
+        seqL = nodesWithMediumSequences.getSequenceLength(handle.id());
+        if (seqL > 0) {
+            return seqL;
+        }
+
+        throw new IllegalStateException("A simple node handle was passed in which does not have a sequence:"+ handle.id());
+        }
+    }
 
     public void add(long id, Sequence sequence) {
         maxNodeId = Math.max(maxNodeId, id);

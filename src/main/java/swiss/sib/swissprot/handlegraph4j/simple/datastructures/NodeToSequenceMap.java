@@ -29,6 +29,8 @@ public interface NodeToSequenceMap {
     long getMaxNodeId();
 
     Sequence getSequence(SimpleNodeHandle handle);
+    
+    int getSequenceLength(SimpleNodeHandle handle);
 
     PrimitiveIterator.OfLong nodeIdsIterator();
 

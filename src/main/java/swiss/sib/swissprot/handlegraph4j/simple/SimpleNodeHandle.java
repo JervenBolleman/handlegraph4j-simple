@@ -33,9 +33,7 @@ public final class SimpleNodeHandle implements NodeHandle {
 
     @Override
     public int hashCode() {
-        int hash = 3;
-        hash = 41 * hash + (int) (this.nodeId ^ (this.nodeId >>> 32));
-        return hash;
+        return Long.hashCode(nodeId);
     }
 
     @Override

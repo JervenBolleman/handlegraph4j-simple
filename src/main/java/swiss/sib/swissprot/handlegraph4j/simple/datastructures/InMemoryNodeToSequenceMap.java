@@ -142,6 +142,24 @@ public class InMemoryNodeToSequenceMap implements NodeToSequenceMap {
 
         throw new IllegalStateException("A simple node handle was passed in which does not have a sequence");
     }
+    
+    @Override
+    public int getSequenceLength(SimpleNodeHandle handle) {
+        Sequence seq = nodesWithShortSequences.getSequence(handle.id());
+        if (seq != null) {
+            return seq.length();
+        }
+        seq = nodesWithLongSequences.getSequence(handle.id());
+        if (seq != null) {
+            return seq.length();
+        }
+        seq = nodesWithMediumSequences.getSequence(handle.id());
+        if (seq != null) {
+            return seq.length();
+        }
+
+        throw new IllegalStateException("A simple node handle was passed in which does not have a sequence");
+    }
 
     public void add(long id, Sequence sequence) {
         maxNodeId = Math.max(maxNodeId, id);

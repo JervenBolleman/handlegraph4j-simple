@@ -39,8 +39,12 @@ public class ShortSequenceMap implements NodeSequenceMap {
     final Map<Sequence, List<RoaringBitmap>> fewNps = new HashMap<>();
 
     public ShortSequenceMap() {
-        init();
-        for (int i = 4; i < MAX_FOR_SHORT_SEQUENCE; i++) {
+        initOneToThreeLengthSequences();
+        initUnknownSequences();
+    }
+
+	void initUnknownSequences() {
+		for (int i = 4; i < MAX_FOR_SHORT_SEQUENCE; i++) {
             byte[] nn = new byte[i];
             Arrays.fill(nn, (byte) 'n');
             RoaringBitmap roaring64Bitmap = new RoaringBitmap();
@@ -48,9 +52,9 @@ public class ShortSequenceMap implements NodeSequenceMap {
             bitmaps.add(roaring64Bitmap);
             fewNps.put(SequenceType.fromByteArray(nn), bitmaps);
         }
-    }
+	}
 
-    private void init() {
+    private void initOneToThreeLengthSequences() {
         //Generate all possible sequences length 1 to 3.
         for (Character ch1 : Sequence.KNOWN_IUPAC_CODES) {
             byte b1 = (byte) ch1.charValue();

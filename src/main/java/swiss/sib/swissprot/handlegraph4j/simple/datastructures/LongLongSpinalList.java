@@ -84,8 +84,9 @@ public class LongLongSpinalList<T> {
                 case COMPRESSED_BUFFERED:
                     chunks.add(new CompressedBufferedChunk<>(map, reconstructor, getKey));
                     break;
+                case SORT:
+                	throw new RuntimeException("Sort is a special chunk that should never be written to disk.");
             }
-
         }
     }
 
@@ -124,7 +125,7 @@ public class LongLongSpinalList<T> {
         AutoClosedIterator<Chunk<T>> from = from(potential.iterator());
 
         AutoClosedIterator<Chunk<T>> chunksHavingKey = filter(from, c -> c.hasKey(key));
-        return flatMap(map(chunksHavingKey, c -> c.<T>fromKey(key, getKey)));
+        return flatMap(map(chunksHavingKey, c -> c.fromKey(key, getKey)));
     }
 
     private int findFirstChunkThatMightMatch(long key) {

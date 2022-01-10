@@ -51,7 +51,7 @@ public class MediumSequenceMap implements NodeSequenceMap {
         this.nodeSequences = nodesWithMediumSequences;
     }
 
-    private static int compareNodeSequence(NodeSequence o1, NodeSequence o2) {
+    private static int compareNodeSequence(NodeSequence<?> o1, NodeSequence<?> o2) {
         return Long.compare(o1.node().id(), o2.node().id());
     }
 
@@ -121,7 +121,7 @@ public class MediumSequenceMap implements NodeSequenceMap {
         return nodeSequences.keyIterator();
     }
 
-    public void add(NodeSequence ns) {
+    public void add(NodeSequence<SimpleNodeHandle> ns) {
         nodeSequences.add(ns);
     }
 
@@ -151,7 +151,7 @@ public class MediumSequenceMap implements NodeSequenceMap {
     @Override
     public void add(long id, Sequence sequence) {
         SimpleNodeHandle node = new SimpleNodeHandle(id);
-        var ns = new NodeSequence(node, sequence);
+        var ns = new NodeSequence<>(node, sequence);
         add(ns);
     }
 

@@ -127,6 +127,11 @@ public class SimplePathGraph implements PathGraph<SimplePathHandle, SimpleStepHa
     public Sequence sequenceOf(SimpleNodeHandle handle) {
         return nodeToSequenceMap.getSequence(handle);
     }
+    
+    @Override
+    public int sequenceLengthOf(SimpleNodeHandle handle) {
+        return nodeToSequenceMap.getSequenceLength(handle);
+    }
 
     public void writeTo(DataOutputStream raf) throws IOException {
         nodeToSequenceMap.writeToDisk(raf);

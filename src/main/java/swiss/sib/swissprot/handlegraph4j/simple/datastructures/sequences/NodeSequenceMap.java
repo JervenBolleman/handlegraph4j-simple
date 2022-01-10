@@ -17,9 +17,19 @@ import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
  */
 public interface NodeSequenceMap {
 
-    void add(long id, Sequence sequence);
+	static final int NOT_FOUND = -404;
+    
+	void add(long id, Sequence sequence);
 
     Sequence getSequence(long id);
+    
+    default int getSequenceLength(long id) {
+    	Sequence sequence = getSequence(id);
+    	if (sequence != null)
+    		return sequence.length();
+    	else
+    		return NOT_FOUND;
+    }
 
     boolean isEmpty();
 

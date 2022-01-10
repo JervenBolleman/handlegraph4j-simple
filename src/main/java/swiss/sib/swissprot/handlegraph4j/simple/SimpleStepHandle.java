@@ -40,8 +40,8 @@ public final class SimpleStepHandle implements StepHandle{
     public int hashCode() {
         int hash = 3;
         hash = 47 * hash + this.pathId;
-        hash = 47 * hash + (int) (this.nodeId ^ (this.nodeId >>> 32));
-        hash = 47 * hash + (int) (this.rank ^ (this.rank >>> 32));
+        hash = 47 * hash + (int) (Long.hashCode(this.nodeId));
+        hash = 47 * hash + (int) (Long.hashCode(this.rank));
         return hash;
     }
 
