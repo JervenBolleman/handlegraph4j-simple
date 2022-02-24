@@ -12,7 +12,7 @@ import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.BufferedSteps;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.ListBackedSteps;
+import swiss.sib.swissprot.handlegraph4j.simple.datastructures.LongListBackedSteps;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.NodeToSequenceMap;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.Steps;
 
@@ -70,7 +70,7 @@ public class Path {
             NodeToSequenceMap nodeToSequenceMap) {
         this.name = name;
         this.id = id;
-        this.steps = new ListBackedSteps();
+        this.steps = new LongListBackedSteps();
         this.nodeToSequenceMap = nodeToSequenceMap;
     }
 

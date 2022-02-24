@@ -5,19 +5,18 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.index;
 
-import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.PrimitiveIterator;
-import java.util.PrimitiveIterator.OfLong;
 import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import static java.util.Spliterator.SIZED;
 import static java.util.Spliterators.spliterator;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.PrimitiveIterator.OfLong;
 import java.util.stream.LongStream;
 import java.util.stream.StreamSupport;
-import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
+
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathGraph;
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleStepHandle;

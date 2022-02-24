@@ -7,13 +7,13 @@ package swiss.sib.swissprot.handlegraph4j.simple.builders;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.eclipse.collections.api.list.primitive.LongList;
+
 import swiss.sib.swissprot.handlegraph4j.simple.Path;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathGraph;
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.InMemoryNodeToSequenceMap;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.ListBackedSteps;
+import swiss.sib.swissprot.handlegraph4j.simple.datastructures.SimpleEdgeList;
+import swiss.sib.swissprot.handlegraph4j.simple.datastructures.Steps;
 
 /**
  *
@@ -23,15 +23,15 @@ class SimplePathGraphBuilder {
 
     final InMemoryNodeToSequenceMap nodeToSequenceMap = new InMemoryNodeToSequenceMap();
     final Map<String, SimplePathHandle> paths = new HashMap<>();
-    final Map<SimplePathHandle, LongList> pathsToSteps = new HashMap<>();
+    final Map<SimplePathHandle, Steps> pathsToSteps = new HashMap<>();
     final SimpleEdgeList edges = new SimpleEdgeList();
 
     public SimplePathGraph build() {
         Map<SimplePathHandle, Path> justpaths = new HashMap<>();
         var iterator = pathsToSteps.entrySet().iterator();
         while (iterator.hasNext()) {
-            Map.Entry<SimplePathHandle, LongList> next = iterator.next();
-            ListBackedSteps steps = new ListBackedSteps(next.getValue());
+            Map.Entry<SimplePathHandle, Steps> next = iterator.next();
+            Steps steps = next.getValue();
 
             SimplePathHandle pathHandle = next.getKey();
             var name = getPathName(pathHandle, paths);
