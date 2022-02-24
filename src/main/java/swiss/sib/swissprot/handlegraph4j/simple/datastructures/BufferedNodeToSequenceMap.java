@@ -5,19 +5,14 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
-import io.github.vgteam.handlegraph4j.NodeSequence;
-import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
-import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.concat;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.filter;
-import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.concat;
-import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
-import static java.util.Spliterators.spliteratorUnknownSize;
-import static java.util.Spliterator.NONNULL;
+import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 import static java.util.Spliterator.DISTINCT;
+import static java.util.Spliterator.NONNULL;
+import static java.util.Spliterators.spliteratorUnknownSize;
 
-import io.github.vgteam.handlegraph4j.sequences.Sequence;
-import io.github.vgteam.handlegraph4j.sequences.SequenceType;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -28,6 +23,12 @@ import java.util.function.LongFunction;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import io.github.vgteam.handlegraph4j.NodeSequence;
+import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
+import io.github.vgteam.handlegraph4j.sequences.Sequence;
+import io.github.vgteam.handlegraph4j.sequences.SequenceType;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences.BufferedLongSequenceMap;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences.BufferedShortSequenceMap;
