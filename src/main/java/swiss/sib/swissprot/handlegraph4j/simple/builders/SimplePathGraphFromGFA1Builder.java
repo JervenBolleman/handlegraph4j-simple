@@ -5,18 +5,11 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.builders;
 
-import static java.nio.charset.StandardCharsets.US_ASCII;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 import org.eclipse.collections.impl.map.mutable.primitive.ObjectLongHashMap;
 
@@ -30,8 +23,6 @@ import io.github.vgteam.handlegraph4j.sequences.Sequence;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleEdgeHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.SimplePathHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.CompressedArrayBackedSteps;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.IntArrayBackedSteps;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.LongListBackedSteps;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.Steps;
 
 /**
@@ -46,14 +37,8 @@ public class SimplePathGraphFromGFA1Builder extends SimplePathGraphBuilder {
 		List<LinkLine> postponedLinkLines = new ArrayList<>();
 		List<PathLine> postponedPathLines = new ArrayList<>();
 		AtomicInteger edgeCount = new AtomicInteger();
-//        try {
-//            Path tempFile = Files.createTempFile("edges", "tmp");
-//            try ( BufferedWriter tempEdges = Files.newBufferedWriter(tempFile, US_ASCII)) {
 		pathId = parseGFAFile(gFA1Reader, postponedSegmentLines, pathId, postponedPathLines, postponedLinkLines,
-				// tempEdges,
 				edgeCount);
-
-//            }
 		long maxNodeId = nodeToSequenceMap.getMaxNodeId();
 
 		ObjectLongHashMap<String> namesToNodeIds = new ObjectLongHashMap<>();
@@ -61,41 +46,12 @@ public class SimplePathGraphFromGFA1Builder extends SimplePathGraphBuilder {
 
 		nodeToSequenceMap.trim();
 
-//            reparseTempEdges(tempFile, edgeCount);
 		parsePostPonedLinkLines(postponedLinkLines, namesToNodeIds);
-
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
 	}
-
-	private void reparseTempEdges(Path tempFile, AtomicInteger edgeCount) throws IOException {
-
-		preSort(tempFile);
-//        edges.resize(edgeCount.get() + 1);
-		try (Stream<String> lines = Files.lines(tempFile, US_ASCII)) {
-			Consumer<String> lineToEdge = l -> {
-				int indexOf = l.indexOf('\t');
-				long from = Long.parseLong(l, 0, indexOf, RADIX);
-				long to = Long.parseLong(l, indexOf + 1, l.length(), RADIX);
-				edges.add(new SimpleEdgeHandle(from, to));
-			};
-			lines.forEach(lineToEdge);
-		}
-		Files.delete(tempFile);
-	}
-
-	private static final int RADIX = 10;
-	private int compressed = 0;
-	private int onlyInts = 0;
-	private int onlyLong = 0;
-	private int postponed = 0;
 
 	private int parseGFAFile(GFA1Reader gFA1Reader, List<SegmentLine> postponedSegmentLines, int pathId,
 			List<PathLine> postponedPathLines, List<LinkLine> postponedLinkLines,
-			// BufferedWriter edgeWriter,
 			AtomicInteger edgeCount)
-//            throws IOException
 	{
 		while (gFA1Reader.hasNext()) {
 			Line next = gFA1Reader.next();
@@ -154,48 +110,23 @@ public class SimplePathGraphFromGFA1Builder extends SimplePathGraphBuilder {
 					stepList[i++] = step.nodeLongId();
 				}
 			} else {
-				postponed++;
 				postponedPathLines.add(pathLine);
 				return newPathId;
 			}
 		}
 		pathsToSteps.put(simplePathHandle, makeStepList(stepList));
 		if (pathsToSteps.size() % 1000 == 0) {
-			System.err.println("Parsed " + pathsToSteps.size() + " " + Instant.now() + " " + compressed + ":" + onlyInts
-					+ ":" + onlyLong + ':' + postponed);
+			System.err.println("Parsed " + pathsToSteps.size() + " " + Instant.now() + " ");
 		}
 		return newPathId;
 	}
 
 	private Steps makeStepList(long[] values) {
-//		boolean maybeInts = true;
-//		for (int i = 0; i < values.length; i++) {
-//			if (Integer.MIN_VALUE < values[i] || values[i] > Integer.MAX_VALUE) {
-//				maybeInts = false;
-//				break;
-//			}
-//		}
-//		if (maybeInts) {
-//			int[] intValues = new int[values.length];
-//			for (int i = 0; i < values.length; i++) {
-//				intValues[i] = (int) values[i];
-//			}
-//			if (values.length > 1024) {
-//				compressed++;
-				return new CompressedArrayBackedSteps(values);
-//			} else {
-//				onlyInts++;
-//				return new IntArrayBackedSteps(intValues);
-//			}
-//		}
-//		onlyLong++;
-//		return new LongListBackedSteps(values);
+		return new CompressedArrayBackedSteps(values);
 	}
 
 	private void accept(LinkLine ll, List<LinkLine> postponedLinkLines,
-//            BufferedWriter edgeWriter,
 			AtomicInteger edgeCount)
-//            throws IOException 
 	{
 		try {
 			String fromNameAsString = ll.getFromNameAsString();
@@ -210,10 +141,6 @@ public class SimplePathGraphFromGFA1Builder extends SimplePathGraphBuilder {
 				toNameAsLong = -toNameAsLong;
 			}
 			edgeCount.incrementAndGet();
-//            edgeWriter.append(Long.toString(toNameAsLong))
-//                    .append('\t')
-//                    .append(Long.toString(fromNameAsLong))
-//                    .append('\n');
 			edges.add(new SimpleEdgeHandle(fromNameAsLong, toNameAsLong));
 		} catch (NumberFormatException f) {
 			postponedLinkLines.add(ll);
@@ -232,27 +159,6 @@ public class SimplePathGraphFromGFA1Builder extends SimplePathGraphBuilder {
 				toNameAsLong = -toNameAsLong;
 			}
 			edges.add(new SimpleEdgeHandle(toNameAsLong, fromNameAsLong));
-		}
-	}
-
-	private void preSort(Path tempFile) {
-		try {
-			String[] preSort = new String[] { "sort", "-n", "-k1", "-k2", tempFile.toString() };
-			Process exec = Runtime.getRuntime().exec(preSort);
-			boolean done = false;
-			try {
-				while (!done) {
-					int waitFor = exec.waitFor();
-					if (waitFor != 0) {
-						throw new RuntimeException("Expected sort to finish ok");
-					}
-					done = true;
-				}
-			} catch (InterruptedException ex) {
-				Thread.interrupted();
-			}
-		} catch (IOException ex) {
-			throw new RuntimeException("Expected sort to finish ok");
 		}
 	}
 }
