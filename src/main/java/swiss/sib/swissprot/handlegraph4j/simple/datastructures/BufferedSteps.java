@@ -5,11 +5,17 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
-import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.from;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
+
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.LongBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.PrimitiveIterator.OfLong;
+
+import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 
 /**
@@ -62,4 +68,12 @@ public class BufferedSteps implements Steps {
     public long nodeIdOfStep(long rank) {
         return nodesInRankOrder.get((int) rank);
     }
+
+	public static BufferedSteps read(RandomAccessFile raf) throws IOException {
+		long noOfSteps = raf.readLong();
+	    MappedByteBuffer map = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, raf.getFilePointer(), noOfSteps * Long.BYTES);
+	    raf.seek(raf.getFilePointer() + noOfSteps * Long.BYTES);
+	    var steps = new BufferedSteps(map.asLongBuffer());
+		return steps;
+	}
 }

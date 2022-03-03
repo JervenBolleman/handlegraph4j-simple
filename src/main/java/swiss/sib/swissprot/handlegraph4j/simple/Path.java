@@ -9,9 +9,8 @@ import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
-import swiss.sib.swissprot.handlegraph4j.simple.datastructures.BufferedSteps;
+
+import swiss.sib.swissprot.handlegraph4j.simple.datastructures.BufferedCompressedArrayBackedSteps;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.LongListBackedSteps;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.NodeToSequenceMap;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.Steps;
@@ -30,17 +29,14 @@ public class Path {
             charname[i] = raf.readChar();
         }
         String name = new String(charname);
-        long noOfSteps = raf.readLong();
-        MappedByteBuffer map = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, raf.getFilePointer(), noOfSteps * Long.BYTES);
-        raf.seek(raf.getFilePointer() + noOfSteps * Long.BYTES);
-        var steps = new BufferedSteps(map.asLongBuffer());
+        var steps = new BufferedCompressedArrayBackedSteps(raf);
         return new Path(name, id, steps, nodeToSequenceMap);
     }
 
-    static void write(Path path, DataOutputStream raf) throws IOException {
+	static void write(Path path, DataOutputStream raf) throws IOException {
         raf.writeInt(path.id);
         writeName(path, raf);
-        writeSteps(raf, path);
+        BufferedCompressedArrayBackedSteps.write(raf, path.steps);
     }
 
     private static void writeName(Path path, DataOutputStream raf) throws IOException {
@@ -48,15 +44,6 @@ public class Path {
         raf.writeInt(chName.length);
         for (char c : chName) {
             raf.writeChar(c);
-        }
-    }
-
-    private static void writeSteps(DataOutputStream raf, Path path) throws IOException {
-        raf.writeLong(path.steps.length());
-        try (var nodes = path.nodeHandles()) {
-            while (nodes.hasNext()) {
-                raf.writeLong(nodes.next().id());
-            }
         }
     }
 
