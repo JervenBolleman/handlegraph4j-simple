@@ -5,20 +5,22 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences;
 
-import io.github.vgteam.handlegraph4j.NodeSequence;
-import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.filter;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.from;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
-import io.github.vgteam.handlegraph4j.sequences.Sequence;
-import io.github.vgteam.handlegraph4j.sequences.SequenceType;
-import io.github.vgteam.handlegraph4j.sequences.ShortAmbiguousSequence;
-import io.github.vgteam.handlegraph4j.sequences.ShortKnownSequence;
+
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.PrimitiveIterator;
 import java.util.function.Predicate;
+
+import io.github.vgteam.handlegraph4j.NodeSequence;
+import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import io.github.vgteam.handlegraph4j.sequences.Sequence;
+import io.github.vgteam.handlegraph4j.sequences.SequenceType;
+import io.github.vgteam.handlegraph4j.sequences.ShortAmbiguousSequence;
+import io.github.vgteam.handlegraph4j.sequences.ShortKnownSequence;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.LongLongSpinalList;
 import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
@@ -33,7 +35,7 @@ public class MediumSequenceMap implements NodeSequenceMap {
         nodesWithMediumSequences.nodeSequences.toStream(raf);
     }
 
-    public static NodeSequenceMap open(RandomAccessFile raf) throws IOException {
+    public static MediumSequenceMap open(RandomAccessFile raf) throws IOException {
         ToLong<NodeSequence<SimpleNodeHandle>> gn = MediumSequenceMap::getNodeId;
         ToLong<NodeSequence<SimpleNodeHandle>> gs = MediumSequenceMap::getSequenceAsLong;
         var nodeSequences = new LongLongSpinalList<>(
