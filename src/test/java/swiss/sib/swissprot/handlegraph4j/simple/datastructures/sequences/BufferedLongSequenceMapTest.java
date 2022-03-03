@@ -40,6 +40,10 @@ public class BufferedLongSequenceMapTest {
         LongSequenceMap nodesWithLongSequences = new LongSequenceMap();
         addSequence("actgactgactgactgactgactgactgactg", nodesWithLongSequences, 0);
         addSequence("CGGCAGAGCTCCCTCCTCAGCACACGG", nodesWithLongSequences, 1);
+        addSequence("CGGCAGAGCTCCCTCCTCAGCACACGGA", nodesWithLongSequences, 2);
+        addSequence("CGGCAGAGCTCCCTCCTCAGCACACGGC", nodesWithLongSequences, 3);
+        addSequence("CGGCAGAGCTCCCTCCTCAGCACACGGT", nodesWithLongSequences, 4);
+        addSequence("CGGCAGAGCTCCCTCCTCAGCACACGGG", nodesWithLongSequences, 5);
         testReadinback(nodesWithLongSequences);
 
     }
