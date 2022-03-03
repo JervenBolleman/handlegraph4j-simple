@@ -9,6 +9,7 @@ import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.from;
 import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.PrimitiveIterator.OfLong;
 import java.util.stream.IntStream;
@@ -29,8 +30,50 @@ public class CompressedArrayBackedSteps implements Steps {
 	private final List<Segment> segments = new ArrayList<>();
 	private final int length;
 
-	private class Segment {
-		public Segment(long[] values, int start, int end) {
+	private interface Segment {
+
+		int length();
+
+		long get(int i);
+
+		LongStream stream();
+	}
+
+	private class CompressedSegment implements Segment {
+		public CompressedSegment(long[] values, long min, int length) {
+			super();
+
+			this.min = Arrays.stream(values).min().getAsLong();
+			int[] intValues = new int[values.length];
+			for (int i = 0; i < values.length; i++) {
+				intValues[i] = (int) (values[i] - this.min);
+			}
+			this.values = iic.compress(intValues);
+			this.length = length;
+		}
+
+		private final int[] values;
+		private final long min;
+		private final int length;
+
+		@Override
+		public int length() {
+			return length;
+		}
+
+		@Override
+		public long get(int i) {
+			return iic.uncompress(values)[i] + this.min;
+		}
+
+		public LongStream stream() {
+			int[] uncompress = iic.uncompress(values);
+			return Arrays.stream(uncompress).mapToLong(i -> i + min);
+		}
+	}
+
+	private class LessCompresedSegment implements Segment {
+		public LessCompresedSegment(long[] values, int start, int end) {
 			super();
 
 			this.length = end - start;
@@ -48,10 +91,12 @@ public class CompressedArrayBackedSteps implements Steps {
 		private final int[] lowbits;
 		private final int length;
 
+		@Override
 		public int length() {
 			return length;
 		}
 
+		@Override
 		public long get(int i) {
 			int rawLow = iic.uncompress(lowbits)[i];
 			long low = ((long) rawLow) << Integer.SIZE;
@@ -70,12 +115,27 @@ public class CompressedArrayBackedSteps implements Steps {
 		int i = 0;
 		while (i < values.length - SEGMENT_SIZE) {
 
-			segments.add(new Segment(values, i, i + SEGMENT_SIZE));
+			long min = values[i];
+			long max = values[i];
 
+			for (int j = i + 1; j < i + SEGMENT_SIZE; j++) {
+				if (values[j] < min) {
+					min = values[j];
+				}
+				if (values[j] > max) {
+					max = values[j];
+				}
+			}
+			long[] section = Arrays.copyOfRange(values, i, i + SEGMENT_SIZE);
+			if (min + max < Integer.MAX_VALUE) {
+				segments.add(new CompressedSegment(section, min, SEGMENT_SIZE));
+			} else {
+				segments.add(new LessCompresedSegment(values, i, i + SEGMENT_SIZE));
+			}
 			i += SEGMENT_SIZE;
 		}
 		if (i != values.length) {
-			segments.add(new Segment(values, i, values.length));
+			segments.add(new LessCompresedSegment(values, i, values.length));
 		}
 		length = values.length;
 	}
