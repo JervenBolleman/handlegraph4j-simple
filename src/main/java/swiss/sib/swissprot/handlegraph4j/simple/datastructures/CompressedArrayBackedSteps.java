@@ -40,7 +40,7 @@ public class CompressedArrayBackedSteps implements Steps {
 	}
 
 	private class CompressedSegment implements Segment {
-		public CompressedSegment(long[] values, long min, int length) {
+		public CompressedSegment(long[] values, int length) {
 			super();
 
 			this.min = Arrays.stream(values).min().getAsLong();
@@ -115,20 +115,10 @@ public class CompressedArrayBackedSteps implements Steps {
 		int i = 0;
 		while (i < values.length - SEGMENT_SIZE) {
 
-			long min = values[i];
-			long max = values[i];
-
-			for (int j = i + 1; j < i + SEGMENT_SIZE; j++) {
-				if (values[j] < min) {
-					min = values[j];
-				}
-				if (values[j] > max) {
-					max = values[j];
-				}
-			}
+			boolean highlyCompressable = testIfHighlyCompressible(values, i);
 			long[] section = Arrays.copyOfRange(values, i, i + SEGMENT_SIZE);
-			if (min + max < Integer.MAX_VALUE) {
-				segments.add(new CompressedSegment(section, min, SEGMENT_SIZE));
+			if (highlyCompressable) {
+				segments.add(new CompressedSegment(section, SEGMENT_SIZE));
 			} else {
 				segments.add(new LessCompresedSegment(values, i, i + SEGMENT_SIZE));
 			}
@@ -138,6 +128,22 @@ public class CompressedArrayBackedSteps implements Steps {
 			segments.add(new LessCompresedSegment(values, i, values.length));
 		}
 		length = values.length;
+	}
+
+	private static boolean testIfHighlyCompressible(long[] values, int i) {
+		long min = values[i];
+		long max = values[i];
+
+		for (int j = i + 1; j < i + SEGMENT_SIZE; j++) {
+			if (values[j] < min) {
+				min = values[j];
+			}
+			if (values[j] > max) {
+				max = values[j];
+			}
+		}
+		boolean highlyCompressable = min + max < Integer.MAX_VALUE;
+		return highlyCompressable;
 	}
 
 	@Override
