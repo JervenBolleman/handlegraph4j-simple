@@ -269,7 +269,7 @@ public class BufferedShortSequenceMap implements NodeSequenceMap {
 	public int getSequenceLength(long id) {
 		int index = (int) (id >>> 32);
 		RoaringBitmap toTest = new RoaringBitmap();
-		toTest.add((int) id);
+		toTest.add((int) id); // Drop the leading part.
 		toTest.runOptimize();
         for (Entry<Integer, List<RoaringBitmap>> en : lengthBitmaps.entrySet()) {
             if (en.getValue().size() > index) {
