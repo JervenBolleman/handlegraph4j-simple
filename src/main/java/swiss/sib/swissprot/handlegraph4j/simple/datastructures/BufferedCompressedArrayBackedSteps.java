@@ -116,18 +116,6 @@ public class BufferedCompressedArrayBackedSteps implements Steps {
 	}
 
 	private static class LessCompressedSegment implements Segment {
-		public LessCompressedSegment(RandomAccessFile raf) throws IOException {
-			super();
-			this.lowBitsLength = raf.readShort();
-			this.highBitsLength = raf.readShort();
-			int endOfSegment = (lowBitsLength * Integer.BYTES) + (highBitsLength * Integer.BYTES);
-			MappedByteBuffer map = raf.getChannel().map(MapMode.READ_ONLY, raf.getFilePointer(), endOfSegment);
-			this.offset = 0;
-
-			this.data = map;
-			raf.seek(raf.getFilePointer() + endOfSegment);
-			this.length = uncompressLow().length;
-		}
 
 		public LessCompressedSegment(MappedByteBuffer map, int offset) throws IOException {
 			super();

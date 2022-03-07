@@ -41,185 +41,192 @@ import swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences.NodeSeq
  */
 public class BufferedNodeToSequenceMap implements NodeToSequenceMap {
 
-    private final BufferedShortSequenceMap nodesWithShortSequences;
-    private final NodeSequenceMap nodesWithMediumSequences;
-    private final NodeSequenceMap nodesWithLongSequences;
+	private final BufferedShortSequenceMap nodesWithShortSequences;
+	private final NodeSequenceMap nodesWithMediumSequences;
+	private final NodeSequenceMap nodesWithLongSequences;
 
-    private long maxNodeId;
+	private long maxNodeId;
 
+	public BufferedNodeToSequenceMap(RandomAccessFile raf) throws IOException {
+		this.nodesWithShortSequences = new BufferedShortSequenceMap(raf);
+		this.nodesWithMediumSequences = MediumSequenceMap.open(raf);
+		this.nodesWithLongSequences = new BufferedLongSequenceMap(raf);
+	}
 
+	@Override
+	public Stream<SimpleNodeHandle> nodes() {
+		return nodesIds().mapToObj(SimpleNodeHandle::new);
+	}
 
-    public BufferedNodeToSequenceMap(RandomAccessFile raf) throws IOException {
-        this.nodesWithShortSequences = new BufferedShortSequenceMap(raf);
-        this.nodesWithMediumSequences = MediumSequenceMap.open(raf);
-        this.nodesWithLongSequences = new BufferedLongSequenceMap(raf);
-    }
-    @Override
-    public Stream<SimpleNodeHandle> nodes() {
-        return nodesIds()
-                .mapToObj(SimpleNodeHandle::new);
-    }
+	@Override
+	public Iterator<SimpleNodeHandle> nodeIterator() {
+		OfLong ids = nodeIdsIterator();
+		return new Iterator<SimpleNodeHandle>() {
+			@Override
+			public boolean hasNext() {
+				return ids.hasNext();
+			}
 
-    @Override
-    public Iterator<SimpleNodeHandle> nodeIterator() {
-        OfLong ids = nodeIdsIterator();
-        return new Iterator<SimpleNodeHandle>() {
-            @Override
-            public boolean hasNext() {
-                return ids.hasNext();
-            }
+			@Override
+			public SimpleNodeHandle next() {
+				long id = ids.nextLong();
+				return new SimpleNodeHandle(id);
+			}
+		};
+	}
 
-            @Override
-            public SimpleNodeHandle next() {
-                long id = ids.nextLong();
-                return new SimpleNodeHandle(id);
-            }
-        };
-    }
+	@Override
+	public Iterator<NodeSequence<SimpleNodeHandle>> nodeWithSequenceIterator() {
+		var smalls = nodesWithShortSequences.nodeSequences();
 
-    @Override
-    public Iterator<NodeSequence<SimpleNodeHandle>> nodeWithSequenceIterator() {
-        var smalls = nodesWithShortSequences.nodeSequences();
+		var longs = nodesWithLongSequences.nodeSequences();
+		var mediums = nodesWithMediumSequences.nodeSequences();
+		var iters = concat(concat(longs, mediums), smalls);
+		return iters;
+	}
 
-        var longs = nodesWithLongSequences.nodeSequences();
-        var mediums = nodesWithMediumSequences.nodeSequences();
-        var iters = concat(concat(longs, mediums), smalls);
-        return iters;
-    }
-
-    @Override
-    public void writeToDisk(DataOutputStream raf) {
+	@Override
+	public void writeToDisk(DataOutputStream raf) {
 //        nodesWithShortSequences.w
-    }
+	}
 
-    public static class AttachNodeToSequence
-            implements LongFunction<NodeSequence<SimpleNodeHandle>> {
+	public static class AttachNodeToSequence implements LongFunction<NodeSequence<SimpleNodeHandle>> {
 
-        private final Sequence seq;
+		private final Sequence seq;
 
-        public AttachNodeToSequence(Sequence seq) {
-            this.seq = seq;
-        }
+		public AttachNodeToSequence(Sequence seq) {
+			this.seq = seq;
+		}
 
-        @Override
-        public NodeSequence<SimpleNodeHandle> apply(long id) {
-            var node = new SimpleNodeHandle(id);
-            return new NodeSequence<>(node, seq);
-        }
-    }
+		@Override
+		public NodeSequence<SimpleNodeHandle> apply(long id) {
+			var node = new SimpleNodeHandle(id);
+			return new NodeSequence<>(node, seq);
+		}
+	}
 
-    @Override
-    public AutoClosedIterator<SimpleNodeHandle> nodesWithSequence(Sequence s) {
-        if (s == null) {
-            return empty();
-        }
-        if (nodesWithShortSequences.containsSequence(s)) {
-            return nodesWithShortSequences.nodeWithSequences(s);
-        }
-        if (s.getType() == SequenceType.LONG_VIA_ID) {
-            var nAndSeq = nodesWithLongSequences.nodeSequences();
-            var filter = filter(nAndSeq, ns -> s.equals(ns.sequence()));
-            return map(filter, NodeSequence::node);
-        } else {
-            return nodesWithMediumSequences.nodeWithSequences(s);
-        }
-    }
+	@Override
+	public AutoClosedIterator<SimpleNodeHandle> nodesWithSequence(Sequence s) {
+		if (s == null) {
+			return empty();
+		}
+		if (nodesWithShortSequences.containsSequence(s)) {
+			return nodesWithShortSequences.nodeWithSequences(s);
+		}
+		if (s.getType() == SequenceType.LONG_VIA_ID) {
+			var nAndSeq = nodesWithLongSequences.nodeSequences();
+			var filter = filter(nAndSeq, ns -> s.equals(ns.sequence()));
+			return map(filter, NodeSequence::node);
+		} else {
+			return nodesWithMediumSequences.nodeWithSequences(s);
+		}
+	}
 
-    @Override
-    public Sequence getSequence(SimpleNodeHandle handle) {
-        Sequence seq = nodesWithShortSequences.getSequence(handle.id());
-        if (seq != null) {
-            return seq;
-        }
-        seq = nodesWithLongSequences.getSequence(handle.id());
-        if (seq != null) {
-            return seq;
-        }
-        seq = nodesWithMediumSequences.getSequence(handle.id());
-        if (seq != null) {
-            return seq;
-        }
+	@Override
+	public Sequence getSequence(SimpleNodeHandle handle) {
+		long postiveId = Math.abs(handle.id());
+		Sequence seq = nodesWithShortSequences.getSequence(postiveId);
+		if (seq != null) {
+			if (postiveId == handle.id())
+				return seq;
+			else
+				return seq.reverseComplement();
+		}
+		seq = nodesWithLongSequences.getSequence(postiveId);
+		if (seq != null) {
+			if (postiveId == handle.id())
+				return seq;
+			else
+				return seq.reverseComplement();
+		}
+		seq = nodesWithMediumSequences.getSequence(postiveId);
+		if (seq != null) {
+			if (postiveId == handle.id())
+				return seq;
+			else
+				return seq.reverseComplement();
+		}
 
-        throw new IllegalStateException("A simple node handle was passed in which does not have a sequence:"+ handle.id());
-    }
-    
-    @Override
-    public int getSequenceLength(SimpleNodeHandle handle) {
-        int seqL = nodesWithShortSequences.getSequenceLength(handle.id());
-        if (seqL > 0) {
-            return seqL;
-        } else {
-        seqL = nodesWithLongSequences.getSequenceLength(handle.id());
-        if (seqL > 0) {
-            return seqL;
-        }
-        seqL = nodesWithMediumSequences.getSequenceLength(handle.id());
-        if (seqL > 0) {
-            return seqL;
-        }
+		throw new IllegalStateException(
+				"A simple node handle was passed in which does not have a sequence:" + handle.id());
+	}
 
-        throw new IllegalStateException("A simple node handle was passed in which does not have a sequence:"+ handle.id());
-        }
-    }
+	@Override
+	public int getSequenceLength(SimpleNodeHandle handle) {
+		long postiveId = Math.abs(handle.id());
+		int seqL = nodesWithShortSequences.getSequenceLength(postiveId);
+		if (seqL > 0) {
+			return seqL;
+		} else {
+			seqL = nodesWithLongSequences.getSequenceLength(postiveId);
+			if (seqL > 0) {
+				return seqL;
+			}
+			seqL = nodesWithMediumSequences.getSequenceLength(postiveId);
+			if (seqL > 0) {
+				return seqL;
+			}
 
-    public void add(long id, Sequence sequence) {
-        maxNodeId = Math.max(maxNodeId, id);
-        if (nodesWithShortSequences.containsSequence(sequence)) {
-            nodesWithShortSequences.add(id, sequence);
-        } else if (sequence.getType() == SequenceType.SHORT_KNOWN
-                || sequence.getType() == SequenceType.SHORT_AMBIGUOUS) {
+			throw new IllegalStateException(
+					"A simple node handle was passed in which does not have a sequence:" + handle.id());
+		}
+	}
 
-            nodesWithMediumSequences.add(id, sequence);
-        } else {
-            nodesWithLongSequences.add(id, sequence);
-        }
-    }
+	public void add(long id, Sequence sequence) {
+		maxNodeId = Math.max(maxNodeId, id);
+		if (nodesWithShortSequences.containsSequence(sequence)) {
+			nodesWithShortSequences.add(id, sequence);
+		} else if (sequence.getType() == SequenceType.SHORT_KNOWN
+				|| sequence.getType() == SequenceType.SHORT_AMBIGUOUS) {
 
-    public void trim() {
-        nodesWithShortSequences.trim();
-        nodesWithLongSequences.trim();
-        nodesWithMediumSequences.trim();
-    }
+			nodesWithMediumSequences.add(id, sequence);
+		} else {
+			nodesWithLongSequences.add(id, sequence);
+		}
+	}
 
-    @Override
-    public long getMaxNodeId() {
-        return maxNodeId;
-    }
+	public void trim() {
+		nodesWithShortSequences.trim();
+		nodesWithLongSequences.trim();
+		nodesWithMediumSequences.trim();
+	}
 
-    @Override
-    public boolean areAllSequencesOneBaseLong() {
+	@Override
+	public long getMaxNodeId() {
+		return maxNodeId;
+	}
 
-        if (nodesWithMediumSequences.isEmpty() && nodesWithLongSequences.isEmpty()) {
-            return nodesWithShortSequences.maxSequenceLength() == 1;
-        }
-        return false;
-    }
+	@Override
+	public boolean areAllSequencesOneBaseLong() {
 
-    @Override
-    public LongStream nodesIds() {
-        return streamFromOfLong(nodeIdsIterator());
-    }
+		if (nodesWithMediumSequences.isEmpty() && nodesWithLongSequences.isEmpty()) {
+			return nodesWithShortSequences.maxSequenceLength() == 1;
+		}
+		return false;
+	}
 
-    @Override
-    public OfLong nodeIdsIterator() {
-        List<OfLong> li = List.of(
-                nodesWithShortSequences.nodeIds(),
-                nodesWithMediumSequences.nodeIds(),
-                nodesWithLongSequences.nodeIds());
-        return new CollectingOfLong(li.iterator());
-    }
+	@Override
+	public LongStream nodesIds() {
+		return streamFromOfLong(nodeIdsIterator());
+	}
 
-    private LongStream streamFromOfLong(OfLong iterator) {
-        var si = spliteratorUnknownSize(iterator,
-                DISTINCT | NONNULL);
-        return StreamSupport.longStream(si, false);
-    }
+	@Override
+	public OfLong nodeIdsIterator() {
+		List<OfLong> li = List.of(nodesWithShortSequences.nodeIds(), nodesWithMediumSequences.nodeIds(),
+				nodesWithLongSequences.nodeIds());
+		return new CollectingOfLong(li.iterator());
+	}
 
-    @Override
-    public long count() {
-        long shortSeqs = nodesWithShortSequences.size();
-        long mediumSeqs = nodesWithMediumSequences.size();
-        long longSeqs = nodesWithLongSequences.size();
-        return shortSeqs + mediumSeqs + longSeqs;
-    }
+	private LongStream streamFromOfLong(OfLong iterator) {
+		var si = spliteratorUnknownSize(iterator, DISTINCT | NONNULL);
+		return StreamSupport.longStream(si, false);
+	}
+
+	@Override
+	public long count() {
+		long shortSeqs = nodesWithShortSequences.size();
+		long mediumSeqs = nodesWithMediumSequences.size();
+		long longSeqs = nodesWithLongSequences.size();
+		return shortSeqs + mediumSeqs + longSeqs;
+	}
 }
