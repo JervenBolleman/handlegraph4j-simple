@@ -1,19 +1,29 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+/**
+ * Copyright (c) 2020, SIB Swiss Institute of Bioinformatics
+ * and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 3 only, as
+ * published by the Free Software Foundation.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 3 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 3 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures.sequences;
 
-import io.github.vgteam.handlegraph4j.NodeSequence;
-import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
-import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.empty;
-import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.flatMap;
-import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.map;
-import static io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator.concat;
-import io.github.vgteam.handlegraph4j.iterators.CollectingOfLong;
-import io.github.vgteam.handlegraph4j.sequences.Sequence;
-import io.github.vgteam.handlegraph4j.sequences.SequenceType;
+import static io.github.jervenbolleman.handlegraph4j.iterators.AutoClosedIterator.empty;
+import static io.github.jervenbolleman.handlegraph4j.iterators.AutoClosedIterator.flatMap;
+import static io.github.jervenbolleman.handlegraph4j.iterators.AutoClosedIterator.map;
+import static io.github.jervenbolleman.handlegraph4j.iterators.AutoClosedIterator.concat;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -25,14 +35,21 @@ import java.util.PrimitiveIterator;
 import java.util.PrimitiveIterator.OfLong;
 import java.util.function.Function;
 import java.util.function.LongFunction;
+
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
+
+import io.github.jervenbolleman.handlegraph4j.NodeSequence;
+import io.github.jervenbolleman.handlegraph4j.iterators.AutoClosedIterator;
+import io.github.jervenbolleman.handlegraph4j.iterators.CollectingOfLong;
+import io.github.jervenbolleman.handlegraph4j.sequences.Sequence;
+import io.github.jervenbolleman.handlegraph4j.sequences.SequenceType;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.BufferedNodeToSequenceMap;
 
 /**
  *
- * @author Jerven Bolleman <jerven.bolleman@sib.swiss>
+ @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
  */
 public class ShortSequenceMap implements NodeSequenceMap {
 	// 32 is the normal max sequence length of VG

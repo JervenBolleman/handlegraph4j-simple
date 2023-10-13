@@ -19,6 +19,12 @@
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
+import static io.github.jervenbolleman.handlegraph4j.iterators.AutoClosedIterator.from;
+import static io.github.jervenbolleman.handlegraph4j.iterators.AutoClosedIterator.map;
+
+import java.util.Arrays;
+import java.util.PrimitiveIterator.OfLong;
+
 import io.github.jervenbolleman.handlegraph4j.iterators.AutoClosedIterator;
 import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 
@@ -26,16 +32,38 @@ import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
  *
  @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
  */
-public interface Steps {
+public class LongArrayBackedSteps implements Steps {
 
-    SimpleNodeHandle firstNode();
+	private final long[] nodesInRankOrder;
 
-    SimpleNodeHandle lastNode();
+	public LongArrayBackedSteps(long[] steps) {
+		this.nodesInRankOrder = steps;
+	}
 
-    AutoClosedIterator<SimpleNodeHandle> nodes();
+	@Override
+	public SimpleNodeHandle firstNode() {
+		return new SimpleNodeHandle(nodesInRankOrder[0]);
+	}
 
-    public long length();
+	@Override
+	public SimpleNodeHandle lastNode() {
+		return new SimpleNodeHandle(nodesInRankOrder[nodesInRankOrder.length - 1]);
+	}
 
-    public long nodeIdOfStep(long rank);
+	@Override
+	public AutoClosedIterator<SimpleNodeHandle> nodes() {
+		OfLong n = Arrays.stream(nodesInRankOrder).iterator();
+		return map(from(n), SimpleNodeHandle::new);
+	}
+
+	@Override
+	public long length() {
+		return nodesInRankOrder.length;
+	}
+
+	@Override
+	public long nodeIdOfStep(long rank) {
+		return nodesInRankOrder[(int) rank];
+	}
 
 }

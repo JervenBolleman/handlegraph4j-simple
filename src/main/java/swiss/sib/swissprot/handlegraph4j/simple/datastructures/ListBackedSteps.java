@@ -33,60 +33,61 @@ import swiss.sib.swissprot.handlegraph4j.simple.SimpleNodeHandle;
 
 /**
  *
- * @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
+ @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
  */
-public class LongListBackedSteps implements Steps {
+public class ListBackedSteps implements Steps {
 
-	private final LongList nodesInRankOrder;
+    private final LongList nodesInRankOrder;
 
-	public LongListBackedSteps() {
-		this.nodesInRankOrder = new LongArrayList();
-	}
+    public ListBackedSteps() {
+        this.nodesInRankOrder = new LongArrayList();
+    }
+    
+    public ListBackedSteps(long[] steps) {
+        this.nodesInRankOrder = new LongArrayList(steps);
+    }
 
-	public LongListBackedSteps(long[] values) {
-		this.nodesInRankOrder = new LongArrayList(values);
-	}
+    public ListBackedSteps(LongList value) {
+        this.nodesInRankOrder = value;
+    }
 
-	public LongListBackedSteps(LongList value) {
-		this.nodesInRankOrder = value;
-	}
+    @Override
+    public SimpleNodeHandle firstNode() {
+        return new SimpleNodeHandle(nodesInRankOrder.get(0));
+    }
 
-	@Override
-	public SimpleNodeHandle firstNode() {
-		return new SimpleNodeHandle(nodesInRankOrder.get(0));
-	}
+    @Override
+    public SimpleNodeHandle lastNode() {
+        return new SimpleNodeHandle(nodesInRankOrder.get(nodesInRankOrder.size() - 1));
+    }
 
-	@Override
-	public SimpleNodeHandle lastNode() {
-		return new SimpleNodeHandle(nodesInRankOrder.get(nodesInRankOrder.size() - 1));
-	}
+    @Override
+    public AutoClosedIterator<SimpleNodeHandle> nodes() {
+        LongIterator longIterator = nodesInRankOrder.longIterator();
+        OfLong n = new OfLong() {
+            @Override
+            public long nextLong() {
+                return longIterator.next();
+            }
 
-	@Override
-	public AutoClosedIterator<SimpleNodeHandle> nodes() {
-		LongIterator longIterator = nodesInRankOrder.longIterator();
-		OfLong n = new OfLong() {
-			@Override
-			public long nextLong() {
-				return longIterator.next();
-			}
+            @Override
+            public boolean hasNext() {
+                return longIterator.hasNext();
+            }
 
-			@Override
-			public boolean hasNext() {
-				return longIterator.hasNext();
-			}
+        };
+        return map(from(n), SimpleNodeHandle::new);
+    }
 
-		};
-		return map(from(n), SimpleNodeHandle::new);
-	}
+    @Override
+    public long length() {
+        return nodesInRankOrder.size();
+    }
 
-	@Override
-	public long length() {
-		return nodesInRankOrder.size();
-	}
-
-	@Override
-	public long nodeIdOfStep(long rank) {
-		return nodesInRankOrder.get((int) rank);
-	}
-
+    @Override
+    public long nodeIdOfStep(long rank) {
+        return nodesInRankOrder.get((int) rank);
+    }
+    
+    
 }

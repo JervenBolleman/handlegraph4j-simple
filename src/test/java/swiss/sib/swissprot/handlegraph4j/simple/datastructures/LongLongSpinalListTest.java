@@ -1,12 +1,29 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+/**
+ * Copyright (c) 2020, SIB Swiss Institute of Bioinformatics
+ * and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 3 only, as
+ * published by the Free Software Foundation.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 3 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 3 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 package swiss.sib.swissprot.handlegraph4j.simple.datastructures;
 
-import swiss.sib.swissprot.handlegraph4j.simple.functions.LongLongToObj;
-import io.github.vgteam.handlegraph4j.iterators.AutoClosedIterator;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -16,14 +33,17 @@ import java.io.RandomAccessFile;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
+
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.io.TempDir;
+
+import io.github.jervenbolleman.handlegraph4j.iterators.AutoClosedIterator;
+import swiss.sib.swissprot.handlegraph4j.simple.functions.LongLongToObj;
 import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
 
 /**
  *
- * @author Jerven Bolleman <jerven.bolleman@sib.swiss>
+ @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
  */
 public class LongLongSpinalListTest {
 
@@ -60,7 +80,7 @@ public class LongLongSpinalListTest {
 
     private LongLongSpinalList<long[]> newInstance(int size) {
 
-        LongLongSpinalList<long[]> instance = new LongLongSpinalList(name, gk, gv, comp);
+        LongLongSpinalList<long[]> instance = new LongLongSpinalList<>(name, gk, gv, comp);
         for (int i = 0; i < size; i++) {
             instance.add(new long[]{i, -i});
         }
@@ -73,7 +93,7 @@ public class LongLongSpinalListTest {
      */
     @Test
     public void testIterateToLeft() {
-        LongLongSpinalList instance = newInstance();
+        LongLongSpinalList<long[]> instance = newInstance();
         for (int i = 0; i < 10; i++) {
             try ( AutoClosedIterator<long[]> result = instance.iterateWithKey(i)) {
                 assertTrue(result.hasNext());
@@ -90,7 +110,7 @@ public class LongLongSpinalListTest {
      */
     @Test
     public void testIsEmpty() {
-        LongLongSpinalList instance = newInstance();
+        LongLongSpinalList<long[]> instance = newInstance();
         boolean expResult = false;
         boolean result = instance.isEmpty();
         assertEquals(expResult, result);
@@ -101,7 +121,7 @@ public class LongLongSpinalListTest {
      */
     @Test
     public void testKeyIterator() {
-        LongLongSpinalList instance = newInstance();
+        LongLongSpinalList<long[]> instance = newInstance();
         PrimitiveIterator.OfLong result = instance.keyIterator();
         for (int i = 0; i < 10; i++) {
             assertTrue(result.hasNext());
@@ -114,7 +134,7 @@ public class LongLongSpinalListTest {
      */
     @Test
     public void testValueIterator() {
-        LongLongSpinalList instance = newInstance();
+        LongLongSpinalList<long[]> instance = newInstance();
         PrimitiveIterator.OfLong result = instance.valueIterator();
         for (int i = 0; i < 10; i++) {
             assertTrue(result.hasNext());
@@ -128,7 +148,7 @@ public class LongLongSpinalListTest {
      */
     @Test
     public void testSize() {
-        LongLongSpinalList instance = newInstance();
+        LongLongSpinalList<long[]> instance = newInstance();
         long expResult = 10L;
         long result = instance.size();
         assertEquals(expResult, result);
@@ -143,7 +163,7 @@ public class LongLongSpinalListTest {
         compareToDisk(tmp, newInstance(1_000_000));
     }
 
-    private void compareToDisk(File tmp, LongLongSpinalList instance) throws IOException {
+    private void compareToDisk(File tmp, LongLongSpinalList<long[]> instance) throws IOException {
         try ( BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(tmp)); 
                 DataOutputStream dos = new DataOutputStream(bos)) {
             instance.toStream(dos);
