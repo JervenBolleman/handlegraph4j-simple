@@ -36,7 +36,7 @@ import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
  * @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
  * @param <T>
  */
-public class CompressedChunk<T> implements Chunk<T> {
+public final class CompressedChunk<T> implements Chunk<T> {
 
 	private final LongLongToObj<T> reconstructor;
 	final int firstKey;

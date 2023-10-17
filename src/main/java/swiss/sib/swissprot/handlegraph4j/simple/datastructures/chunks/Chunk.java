@@ -31,7 +31,7 @@ import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
  *
  @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
  */
-public interface Chunk<T> {
+public sealed interface Chunk<T> permits BasicChunk, CompressedChunk, CompressedBufferedChunk, SearchChunk, BasicBufferedChunk {
 
     public long size();
 

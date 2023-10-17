@@ -46,12 +46,13 @@ import swiss.sib.swissprot.handlegraph4j.simple.datastructures.chunks.Chunk;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.chunks.Chunk.Type;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.chunks.CompressedBufferedChunk;
 import swiss.sib.swissprot.handlegraph4j.simple.datastructures.chunks.CompressedChunk;
+import swiss.sib.swissprot.handlegraph4j.simple.datastructures.chunks.SearchChunk;
 import swiss.sib.swissprot.handlegraph4j.simple.functions.LongLongToObj;
 import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
 
 /**
  *
- @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
+ * @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
  * @param <T> the type of object represented by this key value store
  */
 public class LongLongSpinalList<T> {
@@ -62,7 +63,6 @@ public class LongLongSpinalList<T> {
 	private final ToLong<T> getValue;
 	private final Comparator<T> comparator;
 	private final ArrayList<Chunk<T>> chunks = new ArrayList<>();
-	private BasicChunk<T> current;
 
 	public LongLongSpinalList(LongLongToObj<T> reconstructor, ToLong<T> getKey, ToLong<T> getValue,
 			Comparator<T> comparator) {
@@ -112,11 +112,6 @@ public class LongLongSpinalList<T> {
 	}
 
 	public void trimAndSort() {
-		if (current != null) {
-			current.sort();
-			chunks.add(current);
-			current = null;
-		}
 		sort();
 	}
 
@@ -182,27 +177,40 @@ public class LongLongSpinalList<T> {
 	}
 
 	public void add(T t) {
+		Chunk<T> current;
+		if (chunks.isEmpty()) {
+			addToNewChunk(t);
+		} else {
+			current = chunks.get(chunks.size() - 1);
 
-		if (current == null) {
-			current = new BasicChunk<>(reconstructor, getKey, getValue, comparator);
-		} else if (current.isFull()) {
-			current.sort();
-			if (CompressedChunk.<T>canCompress(current, getKey, getValue)) {
-				CompressedChunk<T> cc = new CompressedChunk<>(current, reconstructor, getKey, getValue);
-				chunks.add(cc);
+			if (current instanceof BasicChunk<T> bc) {
+				if (bc.isFull()) {
+					bc.sort();
+
+					if (CompressedChunk.<T>canCompress(bc, getKey, getValue)) {
+						CompressedChunk<T> cc = new CompressedChunk<>(bc, reconstructor, getKey, getValue);
+						chunks.remove(chunks.size() - 1);
+						chunks.add(cc);
+					}
+					addToNewChunk(t);
+				} else {
+					bc.add(t);
+				}
 			} else {
-				chunks.add(current);
+				addToNewChunk(t);
 			}
-			current = new BasicChunk<>(reconstructor, getKey, getValue, comparator);
 		}
-		current.add(t);
+	}
+
+	private void addToNewChunk(T t) {
+		BasicChunk<T> bc = new BasicChunk<>(reconstructor, getKey, getValue, comparator);
+		bc.add(t);
+		chunks.add(bc);
 	}
 
 	boolean isEmpty() {
-		if (chunks.isEmpty() && current == null) {
+		if (chunks.isEmpty()) {
 			return true;
-		} else if (current != null) {
-			return current.size() == 0;
 		} else {
 			for (Chunk<T> c : chunks) {
 				if (c.first() != null) {
@@ -234,73 +242,4 @@ public class LongLongSpinalList<T> {
 
 	}
 
-	private static class SearchChunk<T> implements Chunk<T> {
-
-		private static final String NOT_SUPPORTED = "Not supported, this is just for the binary search.";
-		private final long key;
-
-		public SearchChunk(long key) {
-			this.key = key;
-		}
-
-		@Override
-		public long size() {
-			throw new UnsupportedOperationException(NOT_SUPPORTED);
-		}
-
-		@Override
-		public boolean isFull() {
-			throw new UnsupportedOperationException(NOT_SUPPORTED);
-		}
-
-		@Override
-		public void sort() {
-			throw new UnsupportedOperationException(NOT_SUPPORTED);
-		}
-
-		@Override
-		public T first() {
-			throw new UnsupportedOperationException(NOT_SUPPORTED);
-		}
-
-		@Override
-		public T last() {
-			throw new UnsupportedOperationException(NOT_SUPPORTED);
-		}
-
-		@Override
-		public OfLong keyIterator() {
-			throw new UnsupportedOperationException(NOT_SUPPORTED);
-		}
-
-		@Override
-		public OfLong valueIterator() {
-			throw new UnsupportedOperationException(NOT_SUPPORTED);
-		}
-
-		@Override
-		public Iterator<T> iterator(int start) {
-			throw new UnsupportedOperationException(NOT_SUPPORTED);
-		}
-
-		@Override
-		public long firstKey() {
-			return key;
-		}
-
-		@Override
-		public long lastKey() {
-			throw new UnsupportedOperationException(NOT_SUPPORTED);
-		}
-
-		@Override
-		public void toStream(DataOutputStream stream) throws IOException {
-			throw new UnsupportedOperationException(NOT_SUPPORTED);
-		}
-
-		@Override
-		public Type getType() {
-			return Type.SORT;
-		}
-	}
 }

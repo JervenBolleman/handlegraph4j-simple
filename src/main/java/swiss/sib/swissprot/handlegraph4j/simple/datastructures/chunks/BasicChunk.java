@@ -37,7 +37,7 @@ import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
  *
  @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
  */
-public class BasicChunk<T> implements Chunk<T> {
+public final class BasicChunk<T> implements Chunk<T> {
 
     long[] keys = new long[LongLongSpinalList.CHUNK_SIZE];
     long[] values = new long[LongLongSpinalList.CHUNK_SIZE];

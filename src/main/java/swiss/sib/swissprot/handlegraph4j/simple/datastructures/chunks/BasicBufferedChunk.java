@@ -33,7 +33,7 @@ import swiss.sib.swissprot.handlegraph4j.simple.functions.ToLong;
  *
  @author <a href="mailto:jerven.bolleman@sib.swiss">Jerven Bolleman</a>
  */
-public class BasicBufferedChunk<T> implements Chunk<T> {
+public final class BasicBufferedChunk<T> implements Chunk<T> {
 
     final ByteBuffer buffer;
     private final LongLongToObj<T> reconstructor;
