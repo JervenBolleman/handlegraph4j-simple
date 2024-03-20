@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.jervenbolleman</groupId>
     <artifactId>handlegraph4j-simple</artifactId>
-    <version>0.1</version>
+    <version>0.2</version>
     <packaging>jar</packaging>
     <licenses>
 		<license>
@@ -104,7 +104,7 @@
         <dependency>
             <groupId>io.github.jervenbolleman</groupId>
             <artifactId>handlegraph4j</artifactId>
-            <version>1.1</version>
+            <version>1.2</version>
         </dependency>
         <dependency>
             <groupId>io.github.jervenbolleman</groupId>
